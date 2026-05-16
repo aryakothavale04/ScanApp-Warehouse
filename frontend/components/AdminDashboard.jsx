@@ -2,7 +2,7 @@
 
 import { Package, PackageCheck, TimerReset, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
+import { api } from "@/src/lib/api";
 import OrderCard from "./OrderCard";
 import ThemeToggle from "./ThemeToggle";
 import Toast from "./Toast";

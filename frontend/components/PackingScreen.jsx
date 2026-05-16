@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Loader2, Play, Square } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "@/lib/api";
+import { api } from "@/src/lib/api";
 import BarcodeScanner from "./BarcodeScanner";
 import PackingChecklist from "./PackingChecklist";
 import ProgressRing from "./ProgressRing";

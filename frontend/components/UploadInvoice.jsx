@@ -2,7 +2,7 @@
 
 import { FileUp, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { api } from "@/src/lib/api";
 
 export default function UploadInvoice({ onUploaded, onToast }) {
   const inputRef = useRef(null);
