@@ -42,11 +42,6 @@ function getOrderItemByIndex(order, itemIndex) {
   return order.items[index];
 }
 
-function itemHasUsableBarcode(item) {
-  const barcode = normalizeBarcode(item.hsnOrBarcode || item.productId?.barcode);
-  return barcode.length > 0 && barcode !== normalizeBarcode(item.quantity);
-}
-
 export async function listOrders(req, res) {
   const orders = await populateOrder(Order.find({}).sort({ createdAt: -1 }));
   res.json({ orders });
@@ -113,10 +108,6 @@ export async function manuallyPackOrderItem(req, res) {
   const item = getOrderItemByIndex(order, req.params.itemIndex);
   if (!item) {
     return res.status(404).json({ message: "Order item not found" });
-  }
-
-  if (itemHasUsableBarcode(item)) {
-    return res.status(409).json({ message: "Scan this product barcode or edit the item if the barcode is wrong" });
   }
 
   item.packedQuantity = item.quantity;

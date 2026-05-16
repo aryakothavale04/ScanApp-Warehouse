@@ -80,7 +80,7 @@ export default function PackingChecklist({ items, lastPackedItemId, onManualPack
           const active = lastPackedItemId && String(lastPackedItemId) === String(activeKey);
           const barcodeLabel = getBarcodeLabel(item);
           const isEditing = editingIndex === index;
-          const canManualPack = barcodeLabel === "Missing" && !done;
+          const canManualPack = !done;
 
           return (
             <article
