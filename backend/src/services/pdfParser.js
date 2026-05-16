@@ -45,10 +45,19 @@ function splitCompactBarcodeQuantity(hsnOrBarcode, quantity, hasExplicitQuantity
   return barcodeWithoutQuantity.length >= 6 ? barcodeWithoutQuantity : barcode;
 }
 
+function normalizeBarcodeField(hsnOrBarcode, quantity, hasExplicitQuantity) {
+  const barcode = splitCompactBarcodeQuantity(hsnOrBarcode, quantity, hasExplicitQuantity);
+  if (!barcode) return "Missing";
+
+  const barcodeAsNumber = toNumber(barcode);
+  const looksLikeQuantity = /^\d+(?:\.\d+)?$/.test(barcode) && Math.abs(barcodeAsNumber - quantity) < 0.001;
+  return !hasExplicitQuantity && looksLikeQuantity ? "Missing" : barcode;
+}
+
 function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, invoiceLine) {
   const hasExplicitQuantity = quantity !== null && quantity !== undefined;
   const calculatedQuantity = quantity || (pricePerUnit > 0 ? totalAmount / pricePerUnit : 0);
-  const barcode = splitCompactBarcodeQuantity(hsnOrBarcode, calculatedQuantity, hasExplicitQuantity);
+  const barcode = normalizeBarcodeField(hsnOrBarcode, calculatedQuantity, hasExplicitQuantity);
 
   return {
     productName: productName.trim(),

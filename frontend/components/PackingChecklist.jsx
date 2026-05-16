@@ -2,6 +2,13 @@
 
 import { Check, PackageX } from "lucide-react";
 
+function getBarcodeLabel(item) {
+  const barcode = item.productId?.barcode || item.hsnOrBarcode;
+  const barcodeAsNumber = Number.parseFloat(barcode);
+  const isQuantityValue = barcode && /^\d+(?:\.\d+)?$/.test(barcode) && Math.abs(barcodeAsNumber - item.quantity) < 0.001;
+  return !barcode || isQuantityValue ? "Missing" : barcode;
+}
+
 export default function PackingChecklist({ items, lastPackedItemId }) {
   const missing = items.filter((item) => item.packedQuantity < item.quantity);
 
@@ -28,7 +35,7 @@ export default function PackingChecklist({ items, lastPackedItemId }) {
                 <div>
                   <h3 className="font-bold leading-tight">{item.productName}</h3>
                   <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-                    HSN / Barcode: {item.productId?.barcode || item.hsnOrBarcode || "Not mapped"}
+                    HSN / Barcode: {getBarcodeLabel(item)}
                   </p>
                 </div>
                 <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${done ? "bg-emerald-600 text-white" : "bg-black/5 text-black/40 dark:bg-white/10 dark:text-white/50"}`}>
