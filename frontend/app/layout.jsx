@@ -5,6 +5,10 @@ export const metadata = {
   title: "ScanApp Packing",
   description: "Wholesale grocery packing checklist with barcode scanning",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/store-logo.jpeg",
+    apple: "/store-logo.jpeg"
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
