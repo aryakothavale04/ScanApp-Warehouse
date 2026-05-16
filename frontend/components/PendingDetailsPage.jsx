@@ -22,7 +22,7 @@ function getPendingItems(order) {
     .filter((item) => item.pendingQuantity > 0);
 }
 
-export default function PendingDetailsPage({ type }) {
+export default function PendingDetailsPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
@@ -45,46 +45,11 @@ export default function PendingDetailsPage({ type }) {
 
   const stats = useMemo(() => {
     const pendingOrders = orders.filter((order) => order.packedStatus !== "Packed");
-    const pendingItems = pendingOrders.flatMap((order) =>
-      getPendingItems(order).map((item) => ({
-        ...item,
-        orderId: order._id,
-        invoiceNo: order.invoiceNo,
-        customerName: order.customerName
-      }))
-    );
-    const pendingProducts = pendingItems.reduce((groups, item) => {
-      const key = item.productId?._id || item.productId || item.hsnOrBarcode || item.productName;
-      const existing = groups.get(key) || {
-        key,
-        productName: item.productName,
-        hsnOrBarcode: item.hsnOrBarcode,
-        pendingQuantity: 0,
-        orders: []
-      };
-
-      existing.pendingQuantity += item.pendingQuantity;
-      existing.orders.push({
-        orderId: item.orderId,
-        itemIndex: item.itemIndex,
-        invoiceNo: item.invoiceNo,
-        customerName: item.customerName,
-        pendingQuantity: item.pendingQuantity
-      });
-      groups.set(key, existing);
-      return groups;
-    }, new Map());
 
     return {
-      pendingOrders,
-      pendingItems,
-      pendingProducts: Array.from(pendingProducts.values()).sort((first, second) =>
-        first.productName.localeCompare(second.productName)
-      )
+      pendingOrders
     };
   }, [orders]);
-
-  const isOrdersPage = type === "orders";
 
   return (
     <main className="min-h-screen safe-bottom">
@@ -96,7 +61,7 @@ export default function PendingDetailsPage({ type }) {
           </Link>
           <div className="min-w-0 flex-1">
             <StoreBrand compact />
-            <h1 className="mt-2 text-xl font-black">{isOrdersPage ? "Pending Order Details" : "Pending Product Details"}</h1>
+            <h1 className="mt-2 text-xl font-black">Pending Order Details</h1>
           </div>
         </header>
 
@@ -104,7 +69,7 @@ export default function PendingDetailsPage({ type }) {
           <div className="grid min-h-[50vh] place-items-center">
             <Loader2 className="animate-spin text-leaf" size={34} />
           </div>
-        ) : isOrdersPage ? (
+        ) : (
           <div className="space-y-4">
             {stats.pendingOrders.map((order) => {
               const pendingItems = getPendingItems(order);
@@ -161,32 +126,6 @@ export default function PendingDetailsPage({ type }) {
               );
             })}
             {!stats.pendingOrders.length && <EmptyState message="No pending orders." />}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {stats.pendingProducts.map((product) => (
-              <section key={product.key} className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
-                <div className="mb-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold">{product.productName}</p>
-                    {product.hsnOrBarcode && <p className="text-xs text-black/45 dark:text-white/45">{product.hsnOrBarcode}</p>}
-                  </div>
-                  <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-bold text-sky-800 dark:bg-sky-950 dark:text-sky-100">
-                    {formatQty(product.pendingQuantity)} pending
-                  </span>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {product.orders.map((order) => (
-                    <div key={`${product.key}-${order.orderId}-${order.itemIndex}`} className="rounded-lg bg-limewash p-3 text-xs dark:bg-white/5">
-                      <p className="font-semibold">{order.invoiceNo}</p>
-                      <p className="truncate text-black/55 dark:text-white/55">{order.customerName}</p>
-                      <p className="mt-1 font-bold">{formatQty(order.pendingQuantity)} pending</p>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            ))}
-            {!stats.pendingProducts.length && <EmptyState message="No pending products." />}
           </div>
         )}
       </div>

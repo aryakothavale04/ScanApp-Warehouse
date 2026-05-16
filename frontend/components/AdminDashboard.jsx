@@ -63,7 +63,6 @@ export default function AdminDashboard() {
       color: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-100"
     },
     {
-      href: "/pending/products",
       label: "Pending Products",
       value: stats.pendingProductQuantity,
       icon: Boxes,
@@ -82,17 +81,31 @@ export default function AdminDashboard() {
         <div className="mb-5 grid grid-cols-2 gap-3">
           {cards.map((card) => {
             const Icon = card.icon;
+            const content = (
+              <>
+                <div className={`mb-3 grid h-10 w-10 place-items-center rounded-lg ${card.color}`}>
+                  <Icon size={20} />
+                </div>
+                <p className="text-xs text-black/50 dark:text-white/50">{card.label}</p>
+                <p className="text-2xl font-black">{card.value}</p>
+              </>
+            );
+
+            if (!card.href) {
+              return (
+                <div key={card.label} className="rounded-lg bg-white p-4 text-left shadow-sm dark:bg-[#151f1a]">
+                  {content}
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={card.label}
                 href={card.href}
                 className="rounded-lg bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft dark:bg-[#151f1a]"
               >
-                <div className={`mb-3 grid h-10 w-10 place-items-center rounded-lg ${card.color}`}>
-                  <Icon size={20} />
-                </div>
-                <p className="text-xs text-black/50 dark:text-white/50">{card.label}</p>
-                <p className="text-2xl font-black">{card.value}</p>
+                {content}
               </Link>
             );
           })}
