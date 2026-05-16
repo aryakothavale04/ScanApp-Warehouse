@@ -45,7 +45,7 @@ export default function PackingScreen({ orderId }) {
     try {
       const data = await api.scan(orderId, barcode);
       setOrder(data.order);
-      setLastPackedItemId(data.packedItem?.productId);
+      setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
       setToast({ type: "success", message: data.message || "Item packed" });
       window.navigator.vibrate?.(70);
       setTimeout(() => setLastPackedItemId(null), 900);

@@ -17,7 +17,8 @@ export default function PackingChecklist({ items, lastPackedItemId }) {
       <div className="grid gap-3">
         {items.map((item) => {
           const done = item.packedQuantity >= item.quantity;
-          const active = lastPackedItemId && String(lastPackedItemId) === String(item.productId?._id || item.productId);
+          const activeKey = item.productId?._id || item.productId || item.hsnOrBarcode;
+          const active = lastPackedItemId && String(lastPackedItemId) === String(activeKey);
           return (
             <article
               key={`${item.productId?._id || item.productName}-${item.productName}`}

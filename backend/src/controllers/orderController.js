@@ -8,6 +8,34 @@ function populateOrder(query) {
   return query.populate("items.productId", "productName barcode aliases category");
 }
 
+function normalizeBarcode(value = "") {
+  return value.toString().trim().replace(/\D/g, "");
+}
+
+function findOrderItemByBarcode(order, barcode) {
+  const scannedBarcode = normalizeBarcode(barcode);
+  if (!scannedBarcode) return null;
+
+  const getItemBarcode = (entry) => normalizeBarcode(entry.hsnOrBarcode || entry.productId?.barcode);
+  const exactMatch = order.items.find((entry) => getItemBarcode(entry) === scannedBarcode);
+  if (exactMatch) return exactMatch;
+
+  const withoutLeadingZeros = scannedBarcode.replace(/^0+/, "");
+  const leadingZeroMatch = order.items.find((entry) => {
+    const itemBarcode = getItemBarcode(entry).replace(/^0+/, "");
+    return itemBarcode && itemBarcode === withoutLeadingZeros;
+  });
+  if (leadingZeroMatch) return leadingZeroMatch;
+
+  const nearMatches = order.items.filter((entry) => {
+    const itemBarcode = getItemBarcode(entry);
+    const lengthDifference = Math.abs(itemBarcode.length - scannedBarcode.length);
+    return itemBarcode && lengthDifference <= 1 && (itemBarcode.includes(scannedBarcode) || scannedBarcode.includes(itemBarcode));
+  });
+
+  return nearMatches.length === 1 ? nearMatches[0] : null;
+}
+
 export async function listOrders(req, res) {
   const orders = await populateOrder(Order.find({}).sort({ createdAt: -1 }));
   res.json({ orders });
@@ -68,18 +96,17 @@ export async function scanBarcode(req, res) {
     return res.status(409).json({ message: "Order is already packed" });
   }
 
+  const scannedBarcode = normalizeBarcode(barcode);
   const product = await Product.findOne({ barcode: barcode.trim() });
-  if (!product) {
-    return res.status(404).json({ message: `Barcode ${barcode} is not in product database` });
-  }
-
-  const item = order.items.find((entry) => String(entry.productId) === String(product._id));
+  const item = findOrderItemByBarcode(order, scannedBarcode) || (
+    product ? order.items.find((entry) => String(entry.productId) === String(product._id)) : null
+  );
   if (!item) {
-    return res.status(404).json({ message: `${product.productName} is not in this order` });
+    return res.status(404).json({ message: `Barcode ${barcode} is not in this order` });
   }
 
   if (item.packedQuantity >= item.quantity) {
-    return res.status(409).json({ message: `${product.productName} already fully packed` });
+    return res.status(409).json({ message: `${item.productName} already fully packed` });
   }
 
   const remainingQuantity = item.quantity - item.packedQuantity;
@@ -89,16 +116,16 @@ export async function scanBarcode(req, res) {
 
   await PackingLog.create({
     orderId: order._id,
-    productId: product._id,
+    productId: item.productId || product?._id,
     scannedAt: new Date(),
     scannedBy,
-    barcode: barcode.trim()
+    barcode: scannedBarcode
   });
 
   const populated = await populateOrder(Order.findById(order._id));
   res.json({
-    message: populated.packedStatus === "Packed" ? "Order completed. सर्व माल पॅक झाला." : `${product.productName} packed`,
-    packedItem: { productId: product._id, productName: product.productName },
+    message: populated.packedStatus === "Packed" ? "Order completed. सर्व माल पॅक झाला." : `${item.productName} packed`,
+    packedItem: { productId: item.productId || product?._id, hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
     order: populated
   });
 }
