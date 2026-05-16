@@ -4,6 +4,7 @@ import {
   getOrder,
   listOrders,
   manuallyPackOrderItem,
+  removePackedOrderItem,
   scanBarcode,
   updateOrderItem,
   uploadInvoice
@@ -19,5 +20,6 @@ router.delete("/:id", deleteOrder);
 router.post("/:id/scan", scanBarcode);
 router.patch("/:id/items/:itemIndex", updateOrderItem);
 router.post("/:id/items/:itemIndex/manual-pack", manuallyPackOrderItem);
+router.post("/:id/items/:itemIndex/remove-pack", removePackedOrderItem);
 
 export default router;

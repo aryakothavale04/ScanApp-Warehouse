@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Edit3, PackageCheck, PackageX, Save, X } from "lucide-react";
+import { Check, Edit3, PackageCheck, PackageX, RotateCcw, Save, X } from "lucide-react";
 import { useState } from "react";
 
 function getBarcodeLabel(item) {
@@ -21,7 +21,7 @@ function createDraft(item) {
   };
 }
 
-export default function PackingChecklist({ items, lastPackedItemId, onManualPack, onUpdateItem, onError }) {
+export default function PackingChecklist({ items, lastPackedItemId, onManualPack, onRemovePacked, onUpdateItem, onError }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
@@ -57,6 +57,17 @@ export default function PackingChecklist({ items, lastPackedItemId, onManualPack
     try {
       setBusyAction(`pack-${index}`);
       await onManualPack(index);
+    } catch (error) {
+      onError?.(error.message);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function removePacked(index) {
+    try {
+      setBusyAction(`remove-${index}`);
+      await onRemovePacked(index);
     } catch (error) {
       onError?.(error.message);
     } finally {
@@ -181,7 +192,7 @@ export default function PackingChecklist({ items, lastPackedItemId, onManualPack
                   </div>
                 </div>
 
-                {(isEditing || canManualPack) && (
+                {(isEditing || canManualPack || done) && (
                   <div className="mb-3 flex flex-wrap gap-2">
                     {isEditing && (
                       <button
@@ -201,6 +212,16 @@ export default function PackingChecklist({ items, lastPackedItemId, onManualPack
                       >
                         <PackageCheck size={16} />
                         Mark packed
+                      </button>
+                    )}
+                    {done && (
+                      <button
+                        onClick={() => removePacked(index)}
+                        disabled={busyAction === `remove-${index}`}
+                        className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-bold text-red-700 disabled:opacity-60"
+                      >
+                        <RotateCcw size={16} />
+                        Remove packed
                       </button>
                     )}
                   </div>

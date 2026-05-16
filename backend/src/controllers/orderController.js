@@ -130,6 +130,37 @@ export async function manuallyPackOrderItem(req, res) {
   });
 }
 
+export async function removePackedOrderItem(req, res) {
+  const order = await Order.findById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const item = getOrderItemByIndex(order, req.params.itemIndex);
+  if (!item) {
+    return res.status(404).json({ message: "Order item not found" });
+  }
+
+  item.packedQuantity = 0;
+  order.recalculateStatus();
+  await order.save();
+
+  await PackingLog.deleteMany({
+    orderId: order._id,
+    $or: [
+      { productId: item.productId },
+      { barcode: normalizeBarcode(item.hsnOrBarcode || item.productId?.barcode) },
+      { barcode: "manual-missing-barcode" }
+    ]
+  });
+
+  const populated = await populateOrder(Order.findById(order._id));
+  res.json({
+    message: `${item.productName} removed from packed`,
+    order: populated
+  });
+}
+
 export async function uploadInvoice(req, res) {
   if (!req.file?.buffer) {
     return res.status(400).json({ message: "Invoice PDF is required" });

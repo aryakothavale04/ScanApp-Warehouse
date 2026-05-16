@@ -123,6 +123,12 @@ export default function PackingScreen({ orderId }) {
     setTimeout(() => setLastPackedItemId(null), 900);
   }, [orderId]);
 
+  const handleRemovePackedItem = useCallback(async (itemIndex) => {
+    const data = await api.removePackedOrderItem(orderId, itemIndex);
+    setOrder(data.order);
+    setToast({ type: "success", message: data.message || "Packed item removed" });
+  }, [orderId]);
+
   if (loading) {
     return (
       <main className="grid min-h-screen place-items-center">
@@ -195,6 +201,7 @@ export default function PackingScreen({ orderId }) {
             items={order.items}
             lastPackedItemId={lastPackedItemId}
             onManualPack={handleManualPackItem}
+            onRemovePacked={handleRemovePackedItem}
             onUpdateItem={handleUpdateItem}
             onError={(message) => setToast({ type: "error", message })}
           />
