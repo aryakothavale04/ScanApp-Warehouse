@@ -4,6 +4,7 @@ import { Package, PackageCheck, TimerReset, TrendingUp } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/src/lib/api";
 import OrderCard from "./OrderCard";
+import StoreBrand from "./StoreBrand";
 import ThemeToggle from "./ThemeToggle";
 import Toast from "./Toast";
 import UploadInvoice from "./UploadInvoice";
@@ -56,11 +57,7 @@ export default function AdminDashboard() {
       <Toast toast={toast} onClose={() => setToast(null)} />
       <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
         <header className="mb-5 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-leaf">Packing Management</p>
-            <h1 className="text-2xl font-black sm:text-3xl">ScanApp Warehouse</h1>
-            <p className="mt-1 text-sm text-black/55 dark:text-white/55">जलद स्कॅनिंग, कमी चुका, live packing status.</p>
-          </div>
+          <StoreBrand />
           <ThemeToggle />
         </header>
 

@@ -7,6 +7,7 @@ import { api } from "@/src/lib/api";
 import BarcodeScanner from "./BarcodeScanner";
 import PackingChecklist from "./PackingChecklist";
 import ProgressRing from "./ProgressRing";
+import StoreBrand from "./StoreBrand";
 import ThemeToggle from "./ThemeToggle";
 import Toast from "./Toast";
 
@@ -84,8 +85,10 @@ export default function PackingScreen({ orderId }) {
             <ArrowLeft size={18} />
           </Link>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm text-black/55 dark:text-white/55">{order.customerName}</p>
-            <h1 className="truncate text-xl font-black">{order.invoiceNo}</h1>
+            <StoreBrand compact />
+            <p className="mt-1 truncate text-xs text-black/55 dark:text-white/55">
+              {order.customerName} - Invoice {order.invoiceNo}
+            </p>
           </div>
           <ThemeToggle />
         </header>
