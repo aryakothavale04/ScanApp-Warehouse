@@ -29,12 +29,30 @@ function toNumber(value) {
   return Number.parseFloat(value?.toString().replace(/,/g, "") || "0");
 }
 
+function splitCompactBarcodeQuantity(hsnOrBarcode, quantity, hasExplicitQuantity) {
+  const barcode = hsnOrBarcode?.trim();
+  if (!barcode || hasExplicitQuantity) return barcode;
+
+  const roundedQuantity = Math.round(quantity);
+  if (!Number.isFinite(roundedQuantity) || Math.abs(quantity - roundedQuantity) > 0.001) {
+    return barcode;
+  }
+
+  const quantitySuffix = roundedQuantity.toString();
+  if (!barcode.endsWith(quantitySuffix)) return barcode;
+
+  const barcodeWithoutQuantity = barcode.slice(0, -quantitySuffix.length);
+  return barcodeWithoutQuantity.length >= 6 ? barcodeWithoutQuantity : barcode;
+}
+
 function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, invoiceLine) {
+  const hasExplicitQuantity = quantity !== null && quantity !== undefined;
   const calculatedQuantity = quantity || (pricePerUnit > 0 ? totalAmount / pricePerUnit : 0);
+  const barcode = splitCompactBarcodeQuantity(hsnOrBarcode, calculatedQuantity, hasExplicitQuantity);
 
   return {
     productName: productName.trim(),
-    hsnOrBarcode: hsnOrBarcode?.trim(),
+    hsnOrBarcode: barcode,
     quantity: Number(calculatedQuantity.toFixed(3)),
     pricePerUnit,
     totalAmount,
