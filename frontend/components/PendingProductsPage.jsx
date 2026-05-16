@@ -43,10 +43,11 @@ export default function PendingProductsPage() {
           const pendingQuantity = Math.max((item.quantity || 0) - (item.packedQuantity || 0), 0);
           if (!pendingQuantity) return;
 
-          const key = item.productId?._id || item.productId || item.hsnOrBarcode || item.productName;
+          const productName = (item.productName || "").trim();
+          const key = productName;
           const existing = groups.get(key) || {
             key,
-            productName: item.productName,
+            productName,
             pendingQuantity: 0
           };
 
