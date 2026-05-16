@@ -107,6 +107,22 @@ export default function PackingScreen({ orderId }) {
     }
   }, [orderId, scanLoading]);
 
+  const handleUpdateItem = useCallback(async (itemIndex, item) => {
+    const data = await api.updateOrderItem(orderId, itemIndex, item);
+    setOrder(data.order);
+    setToast({ type: "success", message: data.message || "Item updated" });
+  }, [orderId]);
+
+  const handleManualPackItem = useCallback(async (itemIndex) => {
+    const data = await api.manualPackOrderItem(orderId, itemIndex);
+    setOrder(data.order);
+    setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
+    setToast({ type: "success", message: data.message || "Item packed" });
+    playScanSound("correct");
+    window.navigator.vibrate?.(70);
+    setTimeout(() => setLastPackedItemId(null), 900);
+  }, [orderId]);
+
   if (loading) {
     return (
       <main className="grid min-h-screen place-items-center">
@@ -175,7 +191,13 @@ export default function PackingScreen({ orderId }) {
             )}
           </div>
 
-          <PackingChecklist items={order.items} lastPackedItemId={lastPackedItemId} />
+          <PackingChecklist
+            items={order.items}
+            lastPackedItemId={lastPackedItemId}
+            onManualPack={handleManualPackItem}
+            onUpdateItem={handleUpdateItem}
+            onError={(message) => setToast({ type: "error", message })}
+          />
         </div>
       </div>
     </main>

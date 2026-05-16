@@ -50,5 +50,13 @@ export const api = {
   scan: (orderId, barcode, scannedBy = "packing-staff") =>
     request(`/api/orders/${orderId}/scan`, "post", {
       data: { barcode, scannedBy }
+    }),
+  updateOrderItem: (orderId, itemIndex, item) =>
+    request(`/api/orders/${orderId}/items/${itemIndex}`, "patch", {
+      data: item
+    }),
+  manualPackOrderItem: (orderId, itemIndex, scannedBy = "packing-staff") =>
+    request(`/api/orders/${orderId}/items/${itemIndex}/manual-pack`, "post", {
+      data: { scannedBy }
     })
 };

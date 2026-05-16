@@ -36,6 +36,17 @@ function findOrderItemByBarcode(order, barcode) {
   return nearMatches.length === 1 ? nearMatches[0] : null;
 }
 
+function getOrderItemByIndex(order, itemIndex) {
+  const index = Number.parseInt(itemIndex, 10);
+  if (!Number.isInteger(index) || index < 0 || index >= order.items.length) return null;
+  return order.items[index];
+}
+
+function itemHasUsableBarcode(item) {
+  const barcode = normalizeBarcode(item.hsnOrBarcode || item.productId?.barcode);
+  return barcode.length > 0 && barcode !== normalizeBarcode(item.quantity);
+}
+
 export async function listOrders(req, res) {
   const orders = await populateOrder(Order.find({}).sort({ createdAt: -1 }));
   res.json({ orders });
@@ -57,6 +68,75 @@ export async function deleteOrder(req, res) {
 
   await PackingLog.deleteMany({ orderId: order._id });
   res.json({ success: true, deletedOrderId: order._id });
+}
+
+export async function updateOrderItem(req, res) {
+  const order = await Order.findById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const item = getOrderItemByIndex(order, req.params.itemIndex);
+  if (!item) {
+    return res.status(404).json({ message: "Order item not found" });
+  }
+
+  const { productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount } = req.body;
+  const nextQuantity = Number(quantity);
+  if (!productName?.trim()) {
+    return res.status(400).json({ message: "Product name is required" });
+  }
+  if (!Number.isFinite(nextQuantity) || nextQuantity <= 0) {
+    return res.status(400).json({ message: "Quantity must be greater than 0" });
+  }
+
+  item.productName = productName.trim();
+  item.hsnOrBarcode = hsnOrBarcode?.trim() || "Missing";
+  item.quantity = nextQuantity;
+  item.pricePerUnit = Number.isFinite(Number(pricePerUnit)) ? Number(pricePerUnit) : 0;
+  item.totalAmount = Number.isFinite(Number(totalAmount)) ? Number(totalAmount) : 0;
+  item.packedQuantity = Math.min(item.packedQuantity, item.quantity);
+
+  order.recalculateStatus();
+  await order.save();
+
+  const populated = await populateOrder(Order.findById(order._id));
+  res.json({ message: `${item.productName} updated`, order: populated });
+}
+
+export async function manuallyPackOrderItem(req, res) {
+  const order = await Order.findById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const item = getOrderItemByIndex(order, req.params.itemIndex);
+  if (!item) {
+    return res.status(404).json({ message: "Order item not found" });
+  }
+
+  if (itemHasUsableBarcode(item)) {
+    return res.status(409).json({ message: "Scan this product barcode or edit the item if the barcode is wrong" });
+  }
+
+  item.packedQuantity = item.quantity;
+  order.recalculateStatus();
+  await order.save();
+
+  await PackingLog.create({
+    orderId: order._id,
+    productId: item.productId,
+    scannedAt: new Date(),
+    scannedBy: req.body.scannedBy || "packing-staff",
+    barcode: "manual-missing-barcode"
+  });
+
+  const populated = await populateOrder(Order.findById(order._id));
+  res.json({
+    message: `${item.productName} manually packed`,
+    packedItem: { productId: item.productId, hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
+    order: populated
+  });
 }
 
 export async function uploadInvoice(req, res) {
