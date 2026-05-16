@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "@/src/lib/api";
 import OrderCard from "./OrderCard";
 import StoreBrand from "./StoreBrand";
-import ThemeToggle from "./ThemeToggle";
 import Toast from "./Toast";
 import UploadInvoice from "./UploadInvoice";
 
@@ -58,7 +57,6 @@ export default function AdminDashboard() {
       <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
         <header className="mb-5 flex items-center justify-between gap-3">
           <StoreBrand />
-          <ThemeToggle />
         </header>
 
         <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">

@@ -8,7 +8,6 @@ import BarcodeScanner from "./BarcodeScanner";
 import PackingChecklist from "./PackingChecklist";
 import ProgressRing from "./ProgressRing";
 import StoreBrand from "./StoreBrand";
-import ThemeToggle from "./ThemeToggle";
 import Toast from "./Toast";
 
 let scanAudioContext;
@@ -140,7 +139,6 @@ export default function PackingScreen({ orderId }) {
               {order.customerName} - Invoice {order.invoiceNo}
             </p>
           </div>
-          <ThemeToggle />
         </header>
 
         {packed && (
