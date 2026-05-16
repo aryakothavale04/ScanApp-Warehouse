@@ -7,6 +7,21 @@ import { api } from "@/src/lib/api";
 import StoreBrand from "./StoreBrand";
 import Toast from "./Toast";
 
+function formatQty(value) {
+  const number = Number(value) || 0;
+  return Number.isInteger(number) ? number : Number(number.toFixed(3));
+}
+
+function getPendingItems(order) {
+  return (order.items || [])
+    .map((item, itemIndex) => ({
+      ...item,
+      itemIndex,
+      pendingQuantity: Math.max((item.quantity || 0) - (item.packedQuantity || 0), 0)
+    }))
+    .filter((item) => item.pendingQuantity > 0);
+}
+
 export default function PendingDetailsPage({ type }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,16 +46,12 @@ export default function PendingDetailsPage({ type }) {
   const stats = useMemo(() => {
     const pendingOrders = orders.filter((order) => order.packedStatus !== "Packed");
     const pendingItems = pendingOrders.flatMap((order) =>
-      (order.items || [])
-        .map((item, itemIndex) => ({
-          ...item,
-          itemIndex,
-          pendingQuantity: Math.max((item.quantity || 0) - (item.packedQuantity || 0), 0),
-          orderId: order._id,
-          invoiceNo: order.invoiceNo,
-          customerName: order.customerName
-        }))
-        .filter((item) => item.pendingQuantity > 0)
+      getPendingItems(order).map((item) => ({
+        ...item,
+        orderId: order._id,
+        invoiceNo: order.invoiceNo,
+        customerName: order.customerName
+      }))
     );
     const pendingProducts = pendingItems.reduce((groups, item) => {
       const key = item.productId?._id || item.productId || item.hsnOrBarcode || item.productName;
@@ -94,27 +105,55 @@ export default function PendingDetailsPage({ type }) {
             <Loader2 className="animate-spin text-leaf" size={34} />
           </div>
         ) : isOrdersPage ? (
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-4">
             {stats.pendingOrders.map((order) => {
-              const pendingItems = (order.items || [])
-                .map((item, itemIndex) => ({
-                  ...item,
-                  itemIndex,
-                  pendingQuantity: Math.max((item.quantity || 0) - (item.packedQuantity || 0), 0)
-                }))
-                .filter((item) => item.pendingQuantity > 0);
+              const pendingItems = getPendingItems(order);
+              const pendingQuantity = pendingItems.reduce((sum, item) => sum + item.pendingQuantity, 0);
 
               return (
                 <section key={order._id} className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
-                  <p className="text-sm font-bold">{order.invoiceNo}</p>
-                  <p className="mb-3 text-xs text-black/55 dark:text-white/55">{order.customerName}</p>
-                  <div className="space-y-2">
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-black/45 dark:text-white/45">Invoice</p>
+                      <h2 className="text-lg font-black">{order.invoiceNo}</h2>
+                      <p className="mt-1 text-sm text-black/60 dark:text-white/60">{order.customerName}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">
+                        {formatQty(pendingQuantity)} pending
+                      </span>
+                      <Link href={`/orders/${order._id}`} className="rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white">
+                        Open Order
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
                     {pendingItems.map((item) => (
-                      <div key={`${order._id}-${item.itemIndex}-${item.productId?._id || item.productId || item.hsnOrBarcode || item.productName}`} className="flex items-center justify-between gap-3 text-sm">
-                        <span className="min-w-0 truncate">{item.productName}</span>
-                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">
-                          {item.pendingQuantity} pending
-                        </span>
+                      <div
+                        key={`${order._id}-${item.itemIndex}-${item.productId?._id || item.productId || item.hsnOrBarcode || item.productName}`}
+                        className="rounded-lg bg-limewash p-3 dark:bg-white/5"
+                      >
+                        <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+                          <p className="min-w-0 flex-1 text-sm font-bold leading-snug">{item.productName}</p>
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">
+                            {formatQty(item.pendingQuantity)} pending
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 text-xs">
+                          <div>
+                            <p className="text-black/45 dark:text-white/45">Required</p>
+                            <p className="font-bold">{formatQty(item.quantity)}</p>
+                          </div>
+                          <div>
+                            <p className="text-black/45 dark:text-white/45">Packed</p>
+                            <p className="font-bold">{formatQty(item.packedQuantity)}</p>
+                          </div>
+                          <div>
+                            <p className="text-black/45 dark:text-white/45">Pending</p>
+                            <p className="font-bold">{formatQty(item.pendingQuantity)}</p>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -133,7 +172,7 @@ export default function PendingDetailsPage({ type }) {
                     {product.hsnOrBarcode && <p className="text-xs text-black/45 dark:text-white/45">{product.hsnOrBarcode}</p>}
                   </div>
                   <span className="shrink-0 rounded-full bg-sky-100 px-2.5 py-1 text-xs font-bold text-sky-800 dark:bg-sky-950 dark:text-sky-100">
-                    {product.pendingQuantity} pending
+                    {formatQty(product.pendingQuantity)} pending
                   </span>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-2">
@@ -141,7 +180,7 @@ export default function PendingDetailsPage({ type }) {
                     <div key={`${product.key}-${order.orderId}-${order.itemIndex}`} className="rounded-lg bg-limewash p-3 text-xs dark:bg-white/5">
                       <p className="font-semibold">{order.invoiceNo}</p>
                       <p className="truncate text-black/55 dark:text-white/55">{order.customerName}</p>
-                      <p className="mt-1 font-bold">{order.pendingQuantity} pending</p>
+                      <p className="mt-1 font-bold">{formatQty(order.pendingQuantity)} pending</p>
                     </div>
                   ))}
                 </div>
