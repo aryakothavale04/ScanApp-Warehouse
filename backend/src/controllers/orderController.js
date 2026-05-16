@@ -21,6 +21,16 @@ export async function getOrder(req, res) {
   res.json({ order });
 }
 
+export async function deleteOrder(req, res) {
+  const order = await Order.findByIdAndDelete(req.params.id);
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  await PackingLog.deleteMany({ orderId: order._id });
+  res.json({ success: true, deletedOrderId: order._id });
+}
+
 export async function uploadInvoice(req, res) {
   if (!req.file?.buffer) {
     return res.status(400).json({ message: "Invoice PDF is required" });

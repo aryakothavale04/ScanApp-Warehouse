@@ -25,6 +25,10 @@ export default function AdminDashboard() {
     }
   }
 
+  function removeOrder(orderId) {
+    setOrders((currentOrders) => currentOrders.filter((order) => order._id !== orderId));
+  }
+
   useEffect(() => {
     loadOrders();
     if ("serviceWorker" in navigator) {
@@ -92,7 +96,9 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">
-                {orders.map((order) => <OrderCard key={order._id} order={order} />)}
+                {orders.map((order) => (
+                  <OrderCard key={order._id} order={order} onDeleted={removeOrder} onToast={setToast} />
+                ))}
                 {!orders.length && (
                   <div className="rounded-lg bg-white p-6 text-center text-sm text-black/55 dark:bg-[#151f1a] dark:text-white/55">
                     No orders yet. Upload a Vyapar invoice PDF to begin.

@@ -4,7 +4,10 @@ const orderItemSchema = new mongoose.Schema(
   {
     productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
     productName: { type: String, required: true, trim: true },
+    hsnOrBarcode: { type: String, trim: true },
     quantity: { type: Number, required: true, min: 0.001 },
+    pricePerUnit: { type: Number, min: 0 },
+    totalAmount: { type: Number, min: 0 },
     packedQuantity: { type: Number, default: 0, min: 0 },
     invoiceLine: { type: String, trim: true }
   },

@@ -27,7 +27,7 @@ export default function PackingChecklist({ items, lastPackedItemId }) {
                 <div>
                   <h3 className="font-bold leading-tight">{item.productName}</h3>
                   <p className="mt-1 text-sm text-black/55 dark:text-white/55">
-                    Barcode: {item.productId?.barcode || "Not mapped"}
+                    HSN / Barcode: {item.productId?.barcode || item.hsnOrBarcode || "Not mapped"}
                   </p>
                 </div>
                 <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${done ? "bg-emerald-600 text-white" : "bg-black/5 text-black/40 dark:bg-white/10 dark:text-white/50"}`}>
@@ -35,6 +35,20 @@ export default function PackingChecklist({ items, lastPackedItemId }) {
                 </div>
               </div>
               <div className="mt-4">
+                <div className="mb-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+                  <div className="rounded-lg bg-black/5 p-2 dark:bg-white/10">
+                    <p className="text-black/50 dark:text-white/50">Qty</p>
+                    <p className="font-bold">{item.quantity}</p>
+                  </div>
+                  <div className="rounded-lg bg-black/5 p-2 dark:bg-white/10">
+                    <p className="text-black/50 dark:text-white/50">Price/unit</p>
+                    <p className="font-bold">₹{item.pricePerUnit ?? 0}</p>
+                  </div>
+                  <div className="rounded-lg bg-black/5 p-2 dark:bg-white/10">
+                    <p className="text-black/50 dark:text-white/50">Amount</p>
+                    <p className="font-bold">₹{item.totalAmount ?? 0}</p>
+                  </div>
+                </div>
                 <div className="mb-2 flex justify-between text-sm font-semibold">
                   <span>Packed</span>
                   <span>{item.packedQuantity}/{item.quantity}</span>

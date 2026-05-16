@@ -38,6 +38,7 @@ export const api = {
   test: () => request("/api/test"),
   orders: () => request("/api/orders"),
   order: (id) => request(`/api/orders/${id}`),
+  deleteOrder: (id) => request(`/api/orders/${id}`, "delete"),
   uploadInvoice: (file) => {
     const formData = new FormData();
     formData.append("invoice", file);

@@ -20,15 +20,32 @@ function extractCustomerName(lines) {
     return lines[billToIndex + 1].trim();
   }
 
-  const customerLine = lines.find((line) => /customer|party|ग्राहक|ग्राहकाचे नाव/i.test(line));
-  const match = customerLine?.match(/(?:customer|party|ग्राहक|ग्राहकाचे नाव)\s*[:\-]?\s*(.+)$/i);
+  const customerLine = lines.find((line) => /customer|party/i.test(line));
+  const match = customerLine?.match(/(?:customer|party)\s*[:\-]?\s*(.+)$/i);
   return match?.[1]?.trim() || "Walk-in Customer";
+}
+
+function toNumber(value) {
+  return Number.parseFloat(value?.toString().replace(/,/g, "") || "0");
+}
+
+function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, invoiceLine) {
+  const calculatedQuantity = quantity || (pricePerUnit > 0 ? totalAmount / pricePerUnit : 0);
+
+  return {
+    productName: productName.trim(),
+    hsnOrBarcode: hsnOrBarcode?.trim(),
+    quantity: Number(calculatedQuantity.toFixed(3)),
+    pricePerUnit,
+    totalAmount,
+    invoiceLine
+  };
 }
 
 function extractItems(lines) {
   const itemLines = [];
-  const detailPattern = /^(\d+(?:\.\d+)?)₹\s*([\d.]+)₹\s*([\d.]+)/;
-  const combinedPattern = /^(\d+)\s*(.+?)\s*(\d+(?:\.\d+)?)₹\s*([\d.]+)₹\s*([\d.]+)/;
+  const detailPattern = /^([A-Z0-9\-/]+)\s*(?:(\d+(?:\.\d+)?)\s+)?₹\s*([\d,]+(?:\.\d+)?)\s*₹\s*([\d,]+(?:\.\d+)?)/i;
+  const combinedPattern = /^(\d+)\s*(.+?)\s+([A-Z0-9\-/]+)\s*(?:(\d+(?:\.\d+)?)\s+)?₹\s*([\d,]+(?:\.\d+)?)\s*₹\s*([\d,]+(?:\.\d+)?)/i;
   const stopPattern = /invoice amount in words|payment type|amounts|sub total|round off|total|balance|bank details/i;
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -37,11 +54,14 @@ function extractItems(lines) {
 
     const combined = line.match(combinedPattern);
     if (combined && !/^#/.test(line)) {
-      itemLines.push({
-        productName: combined[2].trim(),
-        quantity: Number.parseFloat(combined[3]),
-        invoiceLine: line
-      });
+      itemLines.push(buildItem(
+        combined[2],
+        combined[3],
+        combined[4] ? toNumber(combined[4]) : null,
+        toNumber(combined[5]),
+        toNumber(combined[6]),
+        line
+      ));
       continue;
     }
 
@@ -59,14 +79,15 @@ function extractItems(lines) {
       const detail = nextLine.match(detailPattern);
       if (detail) {
         const productName = nameParts.join(" ").trim();
-        const quantity = Number.parseFloat(detail[1]);
-        if (productName && quantity > 0) {
-          itemLines.push({
-            productName,
-            quantity,
-            invoiceLine: `${productName} ${nextLine}`
-          });
+        const hsnOrBarcode = detail[1];
+        const quantity = detail[2] ? toNumber(detail[2]) : null;
+        const pricePerUnit = toNumber(detail[3]);
+        const totalAmount = toNumber(detail[4]);
+
+        if (productName && pricePerUnit > 0 && totalAmount > 0) {
+          itemLines.push(buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, `${productName} ${nextLine}`));
         }
+
         index = cursor;
         break;
       }
@@ -79,10 +100,11 @@ function extractItems(lines) {
 
   const merged = new Map();
   for (const item of itemLines) {
-    const key = item.productName.toLowerCase();
+    const key = `${item.productName.toLowerCase()}|${item.hsnOrBarcode || ""}`;
     const previous = merged.get(key);
     if (previous) {
-      previous.quantity += item.quantity;
+      previous.quantity = Number((previous.quantity + item.quantity).toFixed(3));
+      previous.totalAmount = Number(((previous.totalAmount || 0) + (item.totalAmount || 0)).toFixed(2));
     } else {
       merged.set(key, { ...item });
     }
