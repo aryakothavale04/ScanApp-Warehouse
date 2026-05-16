@@ -63,6 +63,7 @@ export default function AdminDashboard() {
       color: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-100"
     },
     {
+      href: "/pending/products",
       label: "Pending Products",
       value: stats.pendingProductQuantity,
       icon: Boxes,
@@ -90,14 +91,6 @@ export default function AdminDashboard() {
                 <p className="text-2xl font-black">{card.value}</p>
               </>
             );
-
-            if (!card.href) {
-              return (
-                <div key={card.label} className="rounded-lg bg-white p-4 text-left shadow-sm dark:bg-[#151f1a]">
-                  {content}
-                </div>
-              );
-            }
 
             return (
               <Link
