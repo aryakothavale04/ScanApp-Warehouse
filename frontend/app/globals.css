@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: #f6f8f3;
+  color: #17201b;
+  font-family: Arial, "Noto Sans Devanagari", "Nirmala UI", sans-serif;
+}
+
+.dark body {
+  background: #101714;
+  color: #eef7ec;
+}
+
+button, input, select {
+  font: inherit;
+}
+
+.scan-success {
+  animation: tick-pop 420ms ease-out;
+}
+
+@keyframes tick-pop {
+  0% { transform: scale(0.86); opacity: 0.45; }
+  70% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.safe-bottom {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}

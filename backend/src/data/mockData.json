@@ -1,0 +1,53 @@
+{
+  "products": [
+    {
+      "productName": "Aashirvaad Atta 10kg",
+      "barcode": "8901725181225",
+      "aliases": ["आशीर्वाद आटा 10kg", "Aashirwad Atta", "Atta 10 kg"],
+      "category": "Flour"
+    },
+    {
+      "productName": "Fortune Sunflower Oil 1L",
+      "barcode": "8906007281024",
+      "aliases": ["फॉर्च्यून तेल 1L", "Sunflower Oil", "Fortune Oil"],
+      "category": "Oil"
+    },
+    {
+      "productName": "Tata Salt 1kg",
+      "barcode": "8904043901015",
+      "aliases": ["टाटा मीठ", "Tata Namak", "Salt 1kg"],
+      "category": "Salt"
+    },
+    {
+      "productName": "India Gate Basmati Rice 5kg",
+      "barcode": "8901537062255",
+      "aliases": ["बासमती तांदूळ 5kg", "Basmati Rice", "India Gate Rice"],
+      "category": "Rice"
+    },
+    {
+      "productName": "Red Label Tea 1kg",
+      "barcode": "8901030865206",
+      "aliases": ["रेड लेबल चहा", "Tea 1kg", "Red Label Chai"],
+      "category": "Tea"
+    }
+  ],
+  "orders": [
+    {
+      "invoiceNo": "VYP-1001",
+      "customerName": "श्री गणेश किराणा स्टोअर्स",
+      "items": [
+        { "barcode": "8901725181225", "quantity": 2 },
+        { "barcode": "8906007281024", "quantity": 3 },
+        { "barcode": "8904043901015", "quantity": 5 }
+      ]
+    },
+    {
+      "invoiceNo": "VYP-1002",
+      "customerName": "Rahul Mini Mart",
+      "items": [
+        { "barcode": "8901537062255", "quantity": 1 },
+        { "barcode": "8901030865206", "quantity": 2 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+import "./globals.css";
+
+export const metadata = {
+  title: "ScanApp Packing",
+  description: "Wholesale grocery packing checklist with barcode scanning",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "ScanApp"
+  }
+};
+
+export const viewport = {
+  themeColor: "#2f7d46"
+};
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="mr">
+      <body>{children}</body>
+    </html>
+  );
+}
