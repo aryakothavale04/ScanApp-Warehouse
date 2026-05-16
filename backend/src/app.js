@@ -6,15 +6,19 @@ import orderRoutes from "./routes/orderRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
+const DEFAULT_FRONTEND_ORIGIN = "https://scan-app-warehouse.vercel.app";
+
 export function createApp() {
   const app = express();
-  const allowedOrigins = (process.env.FRONTEND_ORIGIN || "")
+  const allowedOrigins = (process.env.FRONTEND_ORIGIN || DEFAULT_FRONTEND_ORIGIN)
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
 
   app.use(helmet());
   const corsOptions = {
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     origin(origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);

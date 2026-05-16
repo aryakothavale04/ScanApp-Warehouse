@@ -1,12 +1,14 @@
 import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+
 if (!API_URL) {
   throw new Error("NEXT_PUBLIC_API_URL is required to make API requests");
 }
 
 const apiClient = axios.create({
   baseURL: API_URL,
+  timeout: 30000,
   headers: {
     "Content-Type": "application/json"
   }
@@ -32,18 +34,19 @@ export async function request(path, method = "get", options = {}) {
 }
 
 export const api = {
-  orders: () => request("/orders"),
-  order: (id) => request(`/orders/${id}`),
+  test: () => request("/api/test"),
+  orders: () => request("/api/orders"),
+  order: (id) => request(`/api/orders/${id}`),
   uploadInvoice: (file) => {
     const formData = new FormData();
     formData.append("invoice", file);
-    return request("/orders/upload", "post", {
+    return request("/api/orders/upload", "post", {
       data: formData,
       headers: { "Content-Type": "multipart/form-data" }
     });
   },
   scan: (orderId, barcode, scannedBy = "packing-staff") =>
-    request(`/orders/${orderId}/scan`, "post", {
+    request(`/api/orders/${orderId}/scan`, "post", {
       data: { barcode, scannedBy }
     })
 };
