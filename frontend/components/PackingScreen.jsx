@@ -11,6 +11,54 @@ import StoreBrand from "./StoreBrand";
 import ThemeToggle from "./ThemeToggle";
 import Toast from "./Toast";
 
+let scanAudioContext;
+
+function getScanAudioContext() {
+  if (typeof window === "undefined") return null;
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return null;
+  scanAudioContext ||= new AudioContext();
+  return scanAudioContext;
+}
+
+function armScanAudio() {
+  const audioContext = getScanAudioContext();
+  audioContext?.resume?.();
+}
+
+function playTone(audioContext, { frequency, start, duration, type = "sine", gain = 0.12 }) {
+  const oscillator = audioContext.createOscillator();
+  const envelope = audioContext.createGain();
+
+  oscillator.type = type;
+  oscillator.frequency.setValueAtTime(frequency, start);
+  envelope.gain.setValueAtTime(0.001, start);
+  envelope.gain.exponentialRampToValueAtTime(gain, start + 0.015);
+  envelope.gain.exponentialRampToValueAtTime(0.001, start + duration);
+
+  oscillator.connect(envelope);
+  envelope.connect(audioContext.destination);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.02);
+}
+
+function playScanSound(result) {
+  const audioContext = getScanAudioContext();
+  if (!audioContext) return;
+
+  audioContext.resume?.();
+  const now = audioContext.currentTime;
+
+  if (result === "correct") {
+    playTone(audioContext, { frequency: 659.25, start: now, duration: 0.11, gain: 0.1 });
+    playTone(audioContext, { frequency: 987.77, start: now + 0.1, duration: 0.16, gain: 0.11 });
+    return;
+  }
+
+  playTone(audioContext, { frequency: 185, start: now, duration: 0.14, type: "sawtooth", gain: 0.09 });
+  playTone(audioContext, { frequency: 146.83, start: now + 0.15, duration: 0.18, type: "sawtooth", gain: 0.08 });
+}
+
 export default function PackingScreen({ orderId }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -48,10 +96,12 @@ export default function PackingScreen({ orderId }) {
       setOrder(data.order);
       setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
       setToast({ type: "success", message: data.message || "Item packed" });
+      playScanSound("correct");
       window.navigator.vibrate?.(70);
       setTimeout(() => setLastPackedItemId(null), 900);
     } catch (error) {
       setToast({ type: "error", message: error.message });
+      playScanSound("wrong");
       window.navigator.vibrate?.([80, 40, 80]);
     } finally {
       setScanLoading(false);
@@ -108,7 +158,10 @@ export default function PackingScreen({ orderId }) {
             <section className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
               <ProgressRing packed={progress.packedQuantity} total={progress.totalQuantity} />
               <button
-                onClick={() => setScannerActive((value) => !value)}
+                onClick={() => {
+                  if (!scannerActive) armScanAudio();
+                  setScannerActive((value) => !value);
+                }}
                 className={`mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-bold text-white ${scannerActive ? "bg-red-600" : "bg-leaf"}`}
               >
                 {scannerActive ? <Square size={18} /> : <Play size={18} />}
