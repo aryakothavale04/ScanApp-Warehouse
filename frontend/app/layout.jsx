@@ -1,4 +1,5 @@
 import "./globals.css";
+import BackendStatusGate from "@/components/BackendStatusGate";
 
 export const metadata = {
   title: "ScanApp Packing",
@@ -18,7 +19,9 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="mr">
-      <body>{children}</body>
+      <body>
+        <BackendStatusGate>{children}</BackendStatusGate>
+      </body>
     </html>
   );
 }

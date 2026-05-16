@@ -1,10 +1,6 @@
 import axios from "axios";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
-
-if (!API_URL) {
-  throw new Error("NEXT_PUBLIC_API_URL is required to make API requests");
-}
+export const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -17,12 +13,16 @@ const apiClient = axios.create({
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    const message = error.response?.data?.message || error.message || "Request failed";
+    const message = error.response?.data?.message || error.message || "Backend is unavailable. Please try again shortly.";
     return Promise.reject(new Error(message));
   }
 );
 
 export async function request(path, method = "get", options = {}) {
+  if (!API_URL) {
+    throw new Error("NEXT_PUBLIC_API_URL is required to make API requests");
+  }
+
   const config = {
     method,
     url: path,
@@ -34,6 +34,7 @@ export async function request(path, method = "get", options = {}) {
 }
 
 export const api = {
+  health: () => request("/api/health"),
   test: () => request("/api/test"),
   orders: () => request("/api/orders"),
   order: (id) => request(`/api/orders/${id}`),
