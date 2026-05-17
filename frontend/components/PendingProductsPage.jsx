@@ -12,91 +12,91 @@ function formatQty(value) {
   return Number.isInteger(number) ? number : Number(number.toFixed(3));
 }
 
-function sanitizePdfText(value = "") {
-  return value
-    .toString()
-    .normalize("NFKD")
-    .replace(/[^\x20-\x7E]/g, "")
-    .replace(/\\/g, "\\\\")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)");
+function getProductDisplayName(item) {
+  return item.productName || "Unnamed product";
 }
 
-function truncateText(value, maxLength) {
-  const text = value.toString();
-  return text.length > maxLength ? `${text.slice(0, maxLength - 3)}...` : text;
+function splitTextLines(context, text, maxWidth) {
+  const words = text.toString().split(/\s+/).filter(Boolean);
+  if (!words.length) return [text.toString()];
+
+  const lines = [];
+  let currentLine = "";
+
+  words.forEach((word) => {
+    const candidate = currentLine ? `${currentLine} ${word}` : word;
+    if (context.measureText(candidate).width <= maxWidth) {
+      currentLine = candidate;
+      return;
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+      currentLine = "";
+    }
+
+    let remaining = word;
+    while (context.measureText(remaining).width > maxWidth && remaining.length > 1) {
+      let sliceLength = remaining.length;
+      while (sliceLength > 1 && context.measureText(remaining.slice(0, sliceLength)).width > maxWidth) {
+        sliceLength -= 1;
+      }
+      lines.push(remaining.slice(0, sliceLength));
+      remaining = remaining.slice(sliceLength);
+    }
+    currentLine = remaining;
+  });
+
+  if (currentLine) lines.push(currentLine);
+  return lines;
 }
 
-function buildPendingProductsPdf(products) {
-  const generatedAt = new Date();
-  const totalQuantity = products.reduce((sum, product) => sum + (Number(product.pendingQuantity) || 0), 0);
-  const rowsPerPage = 32;
-  const pages = [];
-
-  for (let index = 0; index < Math.max(products.length, 1); index += rowsPerPage) {
-    pages.push(products.slice(index, index + rowsPerPage));
-  }
-
+function buildPdfFromImages(images) {
+  const encoder = new TextEncoder();
   const objects = [];
-  const addObject = (content) => {
-    objects.push(content);
+  const addObject = (chunks) => {
+    objects.push(Array.isArray(chunks) ? chunks : [chunks]);
     return objects.length;
   };
 
   const catalogId = addObject("");
   const pagesId = addObject("");
-  const fontId = addObject("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>");
   const pageIds = [];
 
-  pages.forEach((pageRows, pageIndex) => {
-    const lines = [
-      "BT",
-      "/F1 16 Tf",
-      "50 792 Td (Pending Products) Tj",
-      "/F1 9 Tf",
-      `0 -18 Td (Generated: ${sanitizePdfText(generatedAt.toLocaleString())}) Tj`,
-      `0 -14 Td (Products: ${products.length}   Total pending qty: ${sanitizePdfText(formatQty(totalQuantity))}) Tj`,
-      "/F1 11 Tf",
-      "0 -28 Td (Product) Tj",
-      "430 0 Td (Pending Qty) Tj",
-      "-430 -8 Td (_______________________________________________) Tj",
-      "/F1 10 Tf"
-    ];
-
-    if (pageRows.length) {
-      pageRows.forEach((product) => {
-        lines.push(`0 -18 Td (${sanitizePdfText(truncateText(product.productName || "Unnamed product", 64))}) Tj`);
-        lines.push(`430 0 Td (${sanitizePdfText(formatQty(product.pendingQuantity))}) Tj`);
-        lines.push("-430 0 Td");
-      });
-    } else {
-      lines.push("0 -24 Td (No pending products.) Tj");
-    }
-
-    lines.push("/F1 8 Tf");
-    lines.push(`0 -24 Td (Page ${pageIndex + 1} of ${pages.length}) Tj`);
-    lines.push("ET");
-
-    const stream = lines.join("\n");
-    const streamLength = new TextEncoder().encode(stream).length;
-    const contentId = addObject(`<< /Length ${streamLength} >>\nstream\n${stream}\nendstream`);
-    const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+  images.forEach((image, index) => {
+    const imageId = addObject([
+      `<< /Type /XObject /Subtype /Image /Width ${image.pixelWidth} /Height ${image.pixelHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.bytes.length} >>\nstream\n`,
+      image.bytes,
+      "\nendstream"
+    ]);
+    const content = `q\n595 0 0 842 0 0 cm\n/Im${index + 1} Do\nQ`;
+    const contentLength = encoder.encode(content).length;
+    const contentId = addObject(`<< /Length ${contentLength} >>\nstream\n${content}\nendstream`);
+    const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im${index + 1} ${imageId} 0 R >> >> >> /Contents ${contentId} 0 R >>`);
     pageIds.push(pageId);
   });
 
-  objects[catalogId - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
-  objects[pagesId - 1] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+  objects[catalogId - 1] = [`<< /Type /Catalog /Pages ${pagesId} 0 R >>`];
+  objects[pagesId - 1] = [`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`];
 
   const chunks = ["%PDF-1.4\n"];
-  const encoder = new TextEncoder();
   const offsets = [0];
   let length = encoder.encode(chunks[0]).length;
 
-  objects.forEach((object, index) => {
+  objects.forEach((objectChunks, index) => {
     offsets.push(length);
-    const chunk = `${index + 1} 0 obj\n${object}\nendobj\n`;
-    chunks.push(chunk);
-    length += encoder.encode(chunk).length;
+    const prefix = `${index + 1} 0 obj\n`;
+    chunks.push(prefix);
+    length += encoder.encode(prefix).length;
+
+    objectChunks.forEach((chunk) => {
+      chunks.push(chunk);
+      length += typeof chunk === "string" ? encoder.encode(chunk).length : chunk.length;
+    });
+
+    const suffix = "\nendobj\n";
+    chunks.push(suffix);
+    length += encoder.encode(suffix).length;
   });
 
   const xrefOffset = length;
@@ -113,6 +113,132 @@ function buildPendingProductsPdf(products) {
   ].join("\n");
 
   return new Blob([...chunks, xref], { type: "application/pdf" });
+}
+
+function canvasToJpegBytes(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(async (blob) => {
+      if (!blob) {
+        reject(new Error("Could not render pending products PDF."));
+        return;
+      }
+
+      resolve(new Uint8Array(await blob.arrayBuffer()));
+    }, "image/jpeg", 0.95);
+  });
+}
+
+async function buildPendingProductsPdf(products) {
+  const generatedAt = new Date();
+  const totalQuantity = products.reduce((sum, product) => sum + (Number(product.pendingQuantity) || 0), 0);
+  const scale = 2;
+  const pageWidth = 595;
+  const pageHeight = 842;
+  const margin = 44;
+  const productColumnWidth = 382;
+  const rows = products.length
+    ? products.map((product) => ({
+        name: product.productName || "Unnamed product",
+        quantity: formatQty(product.pendingQuantity).toString()
+      }))
+    : [{ name: "No pending products.", quantity: "" }];
+
+  const measureCanvas = document.createElement("canvas");
+  const measureContext = measureCanvas.getContext("2d");
+  measureContext.font = "700 10px Arial, Noto Sans Devanagari, Nirmala UI, sans-serif";
+
+  const preparedRows = rows.map((row) => {
+    const lines = splitTextLines(measureContext, row.name, productColumnWidth);
+    return {
+      ...row,
+      lines,
+      height: Math.max(32, lines.length * 13 + 15)
+    };
+  });
+
+  const pages = [];
+  let pageRows = [];
+  let usedHeight = 150;
+
+  preparedRows.forEach((row) => {
+    if (pageRows.length && usedHeight + row.height > pageHeight - margin - 30) {
+      pages.push(pageRows);
+      pageRows = [];
+      usedHeight = 118;
+    }
+
+    pageRows.push(row);
+    usedHeight += row.height;
+  });
+
+  if (pageRows.length) pages.push(pageRows);
+
+  const images = [];
+
+  for (const [pageIndex, currentRows] of pages.entries()) {
+    const canvas = document.createElement("canvas");
+    canvas.width = pageWidth * scale;
+    canvas.height = pageHeight * scale;
+    const context = canvas.getContext("2d");
+    context.scale(scale, scale);
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, pageWidth, pageHeight);
+
+    context.fillStyle = "#17201b";
+    context.font = "900 18px Arial, Noto Sans Devanagari, Nirmala UI, sans-serif";
+    context.fillText("Pending Products", margin, 52);
+
+    context.font = "400 9px Arial, Noto Sans Devanagari, Nirmala UI, sans-serif";
+    context.fillStyle = "#586159";
+    context.fillText(`Generated: ${generatedAt.toLocaleString()}`, margin, 72);
+    context.fillText(`Products: ${products.length}   Total pending qty: ${formatQty(totalQuantity)}`, margin, 87);
+
+    context.font = "800 10px Arial, Noto Sans Devanagari, Nirmala UI, sans-serif";
+    context.fillStyle = "#17201b";
+    context.fillText("Product", margin, 118);
+    context.textAlign = "right";
+    context.fillText("Missing Qty", pageWidth - margin, 118);
+    context.textAlign = "left";
+    context.strokeStyle = "#dfe6da";
+    context.beginPath();
+    context.moveTo(margin, 128);
+    context.lineTo(pageWidth - margin, 128);
+    context.stroke();
+
+    let y = 150;
+    currentRows.forEach((row) => {
+      context.fillStyle = "#17201b";
+      context.font = "700 10px Arial, Noto Sans Devanagari, Nirmala UI, sans-serif";
+      row.lines.forEach((line, lineIndex) => {
+        context.fillText(line, margin, y + lineIndex * 13);
+      });
+
+      context.fillStyle = "#8a4b00";
+      context.font = "900 10px Arial, Noto Sans Devanagari, Nirmala UI, sans-serif";
+      context.textAlign = "right";
+      context.fillText(row.quantity, pageWidth - margin, y);
+      context.textAlign = "left";
+
+      y += row.height;
+      context.strokeStyle = "#eef2ea";
+      context.beginPath();
+      context.moveTo(margin, y - 10);
+      context.lineTo(pageWidth - margin, y - 10);
+      context.stroke();
+    });
+
+    context.fillStyle = "#586159";
+    context.font = "400 8px Arial, Noto Sans Devanagari, Nirmala UI, sans-serif";
+    context.fillText(`Page ${pageIndex + 1} of ${pages.length}`, margin, pageHeight - 28);
+
+    images.push({
+      bytes: await canvasToJpegBytes(canvas),
+      pixelWidth: canvas.width,
+      pixelHeight: canvas.height
+    });
+  }
+
+  return buildPdfFromImages(images);
 }
 
 export default function PendingProductsPage() {
@@ -146,7 +272,7 @@ export default function PendingProductsPage() {
           const pendingQuantity = Math.max((item.quantity || 0) - (item.packedQuantity || 0), 0);
           if (!pendingQuantity) return;
 
-          const productName = (item.productName || "").trim();
+          const productName = getProductDisplayName(item);
           const key = productName;
           const existing = groups.get(key) || {
             key,
@@ -162,8 +288,8 @@ export default function PendingProductsPage() {
     return Array.from(groups.values()).sort((first, second) => first.productName.localeCompare(second.productName));
   }, [orders]);
 
-  function handleDownloadPdf() {
-    const pdf = buildPendingProductsPdf(pendingProducts);
+  async function handleDownloadPdf() {
+    const pdf = await buildPendingProductsPdf(pendingProducts);
     const url = URL.createObjectURL(pdf);
     const link = document.createElement("a");
     link.href = url;
