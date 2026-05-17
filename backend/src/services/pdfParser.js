@@ -69,6 +69,37 @@ function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmoun
   };
 }
 
+function parseAmountTail(line) {
+  const amountTail = line.match(/^(.*?)(\d+(?:\.\d+)?)\s*(?:₹|â‚¹)\s*([\d,]+(?:\.\d+)?)\s*(?:₹|â‚¹)\s*([\d,]+(?:\.\d+)?)\s*$/);
+  if (!amountTail) return null;
+
+  let productName = amountTail[1].trim();
+  const rawQuantity = amountTail[2];
+  let quantity = toNumber(rawQuantity);
+  const pricePerUnit = toNumber(amountTail[3]);
+  const totalAmount = toNumber(amountTail[4]);
+  const inferredQuantity = pricePerUnit > 0 ? totalAmount / pricePerUnit : null;
+  const roundedInferredQuantity = Math.round(inferredQuantity);
+  const inferredQuantityText = Number.isFinite(roundedInferredQuantity) ? `${roundedInferredQuantity}` : "";
+
+  if (
+    inferredQuantityText &&
+    Math.abs(inferredQuantity - roundedInferredQuantity) < 0.001 &&
+    Math.abs(quantity - roundedInferredQuantity) > 0.001 &&
+    rawQuantity.endsWith(inferredQuantityText)
+  ) {
+    productName = `${productName}${rawQuantity.slice(0, -inferredQuantityText.length)}`.trim();
+    quantity = roundedInferredQuantity;
+  }
+
+  return {
+    productName,
+    quantity,
+    pricePerUnit,
+    totalAmount
+  };
+}
+
 function extractItems(lines) {
   const itemLines = [];
   const detailPattern = /^([A-Z0-9\-/]+)\s*(?:(\d+(?:\.\d+)?)\s+)?₹\s*([\d,]+(?:\.\d+)?)\s*₹\s*([\d,]+(?:\.\d+)?)/i;
@@ -87,6 +118,20 @@ function extractItems(lines) {
         combined[4] ? toNumber(combined[4]) : null,
         toNumber(combined[5]),
         toNumber(combined[6]),
+        line
+      ));
+      continue;
+    }
+
+    const compactCombined = line.match(/^(\d+)\s+(.+)/);
+    const compactCombinedDetail = compactCombined ? parseAmountTail(compactCombined[2]) : null;
+    if (compactCombinedDetail && compactCombinedDetail.productName && !/^#/.test(line)) {
+      itemLines.push(buildItem(
+        compactCombinedDetail.productName,
+        null,
+        compactCombinedDetail.quantity,
+        compactCombinedDetail.pricePerUnit,
+        compactCombinedDetail.totalAmount,
         line
       ));
       continue;
@@ -113,6 +158,25 @@ function extractItems(lines) {
 
         if (productName && pricePerUnit > 0 && totalAmount > 0) {
           itemLines.push(buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, `${productName} ${nextLine}`));
+        }
+
+        index = cursor;
+        break;
+      }
+
+      const compactDetail = parseAmountTail(nextLine);
+      if (compactDetail) {
+        const productName = [...nameParts, compactDetail.productName].filter(Boolean).join(" ").trim();
+
+        if (productName && compactDetail.pricePerUnit > 0 && compactDetail.totalAmount > 0) {
+          itemLines.push(buildItem(
+            productName,
+            null,
+            compactDetail.quantity,
+            compactDetail.pricePerUnit,
+            compactDetail.totalAmount,
+            `${productName} ${nextLine}`
+          ));
         }
 
         index = cursor;
