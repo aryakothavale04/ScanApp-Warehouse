@@ -8,7 +8,10 @@ export const invoiceUpload = multer({
   storage,
   limits: { fileSize: maxInvoiceSizeMb * 1024 * 1024 },
   fileFilter(req, file, cb) {
-    if (file.mimetype !== "application/pdf") {
+    const isPdfMime = file.mimetype === "application/pdf" || file.mimetype === "application/octet-stream";
+    const isPdfName = /\.pdf$/i.test(file.originalname || "");
+
+    if (!isPdfMime && !isPdfName) {
       cb(new Error("Only PDF invoices are allowed"));
       return;
     }

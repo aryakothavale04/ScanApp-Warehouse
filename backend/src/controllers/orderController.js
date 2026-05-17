@@ -298,7 +298,7 @@ export async function uploadInvoice(req, res) {
       console.warn("Suspicious invoice parse rejected:", safeItems);
       return res.status(422).json({
         success: false,
-        message: "Could not read clean invoice items. Please upload the original Vyapar PDF instead of a shared, scanned, or compressed copy."
+        message: "Invoice items were not cleanly extracted. Please upload the original Vyapar PDF export, not a photo, scan, or compressed shared copy."
       });
     }
 
@@ -313,7 +313,7 @@ export async function uploadInvoice(req, res) {
     return res.status(201).json(populated);
   } catch (error) {
     console.error("Parser error:", error);
-    return res.status(422).json({ success: false, message: "Unsupported invoice format" });
+    return res.status(error.statusCode || 422).json({ success: false, message: error.message || "Unsupported invoice format" });
   }
 }
 

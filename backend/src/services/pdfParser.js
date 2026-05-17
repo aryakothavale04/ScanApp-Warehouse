@@ -1,8 +1,17 @@
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
 
-function cleanLines(text) {
-  return (text || "")
+function normalizePdfText(text = "") {
+  return text
     .replace(/\u0000/g, "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\u20b9|â‚¹/g, " Rs ")
+    .replace(/Ã—|×|✕|✖/g, "x")
+    .replace(/[“”]/g, "\"")
+    .replace(/[‘’]/g, "'");
+}
+
+function cleanLines(text) {
+  return normalizePdfText(text || "")
     .split(/\r?\n/)
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter(Boolean);
@@ -27,6 +36,36 @@ function extractCustomerName(lines) {
 
 function toNumber(value) {
   return Number.parseFloat(value?.toString().replace(/,/g, "") || "0");
+}
+
+function normalizeNameKey(value = "") {
+  return value
+    .toString()
+    .normalize("NFKC")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function cleanProductName(value = "") {
+  return value
+    .toString()
+    .replace(/^#?\s*\d{1,3}\s+/, "")
+    .replace(/\b(item\s*name|product\s*name|description|hsn\/?sac|hsn|barcode|qty|quantity|rate|price|amount|total)\b/gi, " ")
+    .replace(/\b(rs|inr)\b/gi, " ")
+    .replace(/[|:_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isLikelyHeaderLine(line = "") {
+  const normalized = line.toString().toLowerCase();
+  return (
+    /^#/.test(normalized) ||
+    /\b(item\s*name|product\s*name|description)\b/.test(normalized) ||
+    /\b(hsn|barcode)\b.*\b(qty|quantity)\b/.test(normalized) ||
+    /\b(qty|quantity)\b.*\b(rate|price)\b.*\b(amount|total)\b/.test(normalized)
+  );
 }
 
 function splitCompactBarcodeQuantity(hsnOrBarcode, quantity, hasExplicitQuantity) {
@@ -59,15 +98,15 @@ function logMalformedRow(row) {
 }
 
 function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, invoiceLine) {
-  const safeName = productName?.toString().trim();
+  const safeName = cleanProductName(productName);
   const safePrice = Number.isFinite(pricePerUnit) ? pricePerUnit : 0;
   const safeTotal = Number.isFinite(totalAmount) ? totalAmount : 0;
 
-  if (!safeName || safePrice <= 0 || safeTotal <= 0) return null;
+  if (!safeName || isLikelyHeaderLine(safeName) || safePrice <= 0 || safeTotal <= 0) return null;
 
   const hasExplicitQuantity = quantity !== null && quantity !== undefined && Number.isFinite(quantity);
   const calculatedQuantity = hasExplicitQuantity ? quantity : safeTotal / safePrice;
-  if (!Number.isFinite(calculatedQuantity) || calculatedQuantity <= 0) return null;
+  if (!Number.isFinite(calculatedQuantity) || calculatedQuantity <= 0 || calculatedQuantity > 100000) return null;
 
   return {
     productName: safeName,
@@ -81,6 +120,7 @@ function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmoun
 
 function parseAmountTail(line) {
   if (!line || typeof line !== "string") return null;
+  if (isLikelyHeaderLine(line)) return null;
 
   const matches = [...line.matchAll(/[\d,]+(?:\.\d+)?/g)];
   if (matches.length < 3) return null;
@@ -118,15 +158,18 @@ function parseAmountTail(line) {
 }
 
 function getItemSectionLines(lines) {
-  const startIndex = lines.findIndex((line) => /^#\s*item\s*name/i.test(line));
-  const stopPattern = /invoice amount in words|payment type|amounts|sub total|round off|total|balance|bank details/i;
+  const startIndex = lines.findIndex((line) => (
+    /^#\s*item\s*name/i.test(line) ||
+    (/\b(item\s*name|product\s*name|description)\b/i.test(line) && /\b(qty|quantity|rate|amount|total)\b/i.test(line))
+  ));
+  const stopPattern = /invoice amount in words|payment type|amounts|sub total|taxable amount|total tax|cgst|sgst|igst|round off|grand total|total|balance|bank details/i;
   if (startIndex < 0) return [];
 
   const section = [];
   for (let index = startIndex + 1; index < lines.length; index += 1) {
     const line = lines[index];
     if (stopPattern.test(line)) break;
-    section.push(line);
+    if (!isLikelyHeaderLine(line)) section.push(line);
   }
 
   return section;
@@ -170,7 +213,7 @@ function chunkVyaparRows(lines) {
 }
 
 function extractVyaparAmounts(row) {
-  const currencyNumbers = [...row.matchAll(/₹\s*([\d,]+(?:\.\d+)?)/g)];
+  const currencyNumbers = [...row.matchAll(/(?:Rs|INR)\s*([\d,]+(?:\.\d+)?)/gi)];
   if (currencyNumbers.length >= 2) {
     const priceMatch = currencyNumbers.at(-2);
     const totalMatch = currencyNumbers.at(-1);
@@ -194,16 +237,19 @@ function extractVyaparAmounts(row) {
 }
 
 function extractQuantityFromName(name) {
-  const packMatch = name.match(/(?:₹\s*)?\d+(?:\.\d+)?\s*[x×X]\s*(\d+(?:\.\d+)?)/);
+  const packMatch = name.match(/(?:Rs\s*)?\d+(?:\.\d+)?\s*x\s*(\d+(?:\.\d+)?)/i);
   return packMatch ? toNumber(packMatch[1]) : null;
 }
 
 function parseVyaparRow(row) {
+  if (!row || isLikelyHeaderLine(row)) return null;
+
   const amounts = extractVyaparAmounts(row);
   if (!amounts || amounts.pricePerUnit <= 0 || amounts.totalAmount <= 0) return null;
 
   const inferredQuantity = amounts.totalAmount / amounts.pricePerUnit;
   const roundedInferredQuantity = Math.round(inferredQuantity);
+  const spacedBarcodeQuantityMatch = amounts.beforeAmounts.match(/(?:^|\s)(\d{6,14})\s+(\d+(?:\.\d+)?)$/);
   const tailBarcodeMatch = amounts.beforeAmounts.match(/(\d{6,})(\d{1,3})?$/);
   const explicitPackQuantity = extractQuantityFromName(amounts.beforeAmounts);
 
@@ -211,7 +257,11 @@ function parseVyaparRow(row) {
   let quantity = Number.isFinite(explicitPackQuantity) && explicitPackQuantity > 0 ? explicitPackQuantity : null;
   let productName = amounts.beforeAmounts;
 
-  if (tailBarcodeMatch) {
+  if (spacedBarcodeQuantityMatch) {
+    hsnOrBarcode = spacedBarcodeQuantityMatch[1];
+    quantity = toNumber(spacedBarcodeQuantityMatch[2]);
+    productName = amounts.beforeAmounts.slice(0, spacedBarcodeQuantityMatch.index).trim();
+  } else if (tailBarcodeMatch) {
     const compactCode = tailBarcodeMatch[0];
     const inferredText = Number.isFinite(roundedInferredQuantity) ? roundedInferredQuantity.toString() : "";
     if (
@@ -228,7 +278,7 @@ function parseVyaparRow(row) {
 
     productName = amounts.beforeAmounts.slice(0, tailBarcodeMatch.index).trim();
 
-    if (hsnOrBarcode.length > 13 && productName.endsWith("₹")) {
+    if (hsnOrBarcode.length > 13 && productName.endsWith("Rs")) {
       const leadingNameDigits = hsnOrBarcode.slice(0, -13);
       hsnOrBarcode = hsnOrBarcode.slice(-13);
       productName = `${productName}${leadingNameDigits}`.trim();
@@ -260,19 +310,46 @@ function pushItem(itemLines, item, row) {
   logMalformedRow(row);
 }
 
+function mergeInvoiceItems(items) {
+  const merged = new Map();
+  for (const item of items) {
+    if (!item?.productName || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+      logMalformedRow(item);
+      continue;
+    }
+
+    const key = `${normalizeNameKey(item.productName)}|${item.hsnOrBarcode || ""}|${item.pricePerUnit || 0}`;
+    const previous = merged.get(key);
+    if (previous) {
+      previous.quantity = Number((previous.quantity + item.quantity).toFixed(3));
+      previous.totalAmount = Number(((previous.totalAmount || 0) + (item.totalAmount || 0)).toFixed(2));
+    } else {
+      merged.set(key, { ...item });
+    }
+  }
+
+  return Array.from(merged.values());
+}
+
 function extractItems(lines) {
-  const vyaparItems = extractVyaparItems(lines);
-  if (vyaparItems.length) return vyaparItems;
+  const candidates = [...extractVyaparItems(lines)];
+  if (candidates.length) return mergeInvoiceItems(candidates);
 
   const itemLines = [];
   const detailPattern = /^([A-Z0-9\-/]+)\s*(?:(\d+(?:\.\d+)?)\s+)?[^\d]*([\d,]+(?:\.\d+)?)\s+[^\d]*([\d,]+(?:\.\d+)?)/i;
   const combinedPattern = /^(\d+)\s*(.+?)\s+([A-Z0-9\-/]+)\s*(?:(\d+(?:\.\d+)?)\s+)?[^\d]*([\d,]+(?:\.\d+)?)\s+[^\d]*([\d,]+(?:\.\d+)?)/i;
-  const stopPattern = /invoice amount in words|payment type|amounts|sub total|round off|total|balance|bank details/i;
+  const stopPattern = /invoice amount in words|payment type|amounts|sub total|taxable amount|total tax|cgst|sgst|igst|round off|grand total|total|balance|bank details/i;
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
-    if (!line || typeof line !== "string") continue;
+    if (!line || typeof line !== "string" || isLikelyHeaderLine(line)) continue;
     if (stopPattern.test(line)) break;
+
+    const vyaparRow = parseVyaparRow(line);
+    if (vyaparRow) {
+      pushItem(itemLines, vyaparRow, line);
+      continue;
+    }
 
     const combined = line.match(combinedPattern);
     if (combined && !/^#/.test(line)) {
@@ -322,7 +399,7 @@ function extractItems(lines) {
         continue;
       }
 
-      if (stopPattern.test(nextLine) || /^invoice$/i.test(nextLine) || /^#item name/i.test(nextLine)) {
+      if (stopPattern.test(nextLine) || /^invoice$/i.test(nextLine) || isLikelyHeaderLine(nextLine)) {
         break;
       }
 
@@ -374,24 +451,7 @@ function extractItems(lines) {
     }
   }
 
-  const merged = new Map();
-  for (const item of itemLines) {
-    if (!item?.productName || !Number.isFinite(item.quantity) || item.quantity <= 0) {
-      logMalformedRow(item);
-      continue;
-    }
-
-    const key = `${item.productName.toLowerCase()}|${item.hsnOrBarcode || ""}`;
-    const previous = merged.get(key);
-    if (previous) {
-      previous.quantity = Number((previous.quantity + item.quantity).toFixed(3));
-      previous.totalAmount = Number(((previous.totalAmount || 0) + (item.totalAmount || 0)).toFixed(2));
-    } else {
-      merged.set(key, { ...item });
-    }
-  }
-
-  return Array.from(merged.values());
+  return mergeInvoiceItems(itemLines);
 }
 
 export async function parseVyaparInvoice(buffer) {
@@ -400,6 +460,10 @@ export async function parseVyaparInvoice(buffer) {
     console.log("Extracted PDF text:", parsed?.text || "");
 
     const lines = cleanLines(parsed?.text);
+    if (lines.length < 5) {
+      throw Object.assign(new Error("PDF has no readable invoice text. Please upload the original Vyapar PDF, not a photo or scanned PDF."), { statusCode: 422 });
+    }
+
     const items = extractItems(lines);
 
     if (!items.length) {
@@ -414,6 +478,7 @@ export async function parseVyaparInvoice(buffer) {
     };
   } catch (error) {
     console.error("Parser error:", error);
-    throw Object.assign(new Error("Unsupported invoice format"), { statusCode: 422, cause: error });
+    const message = error.statusCode === 422 ? error.message : "Unsupported invoice format";
+    throw Object.assign(new Error(message), { statusCode: 422, cause: error });
   }
 }

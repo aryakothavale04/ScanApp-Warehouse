@@ -48,6 +48,7 @@ export const api = {
     formData.append("invoice", file);
     return request("/api/orders/upload", "post", {
       data: formData,
+      timeout: 120000,
       headers: { "Content-Type": "multipart/form-data" }
     });
   },
