@@ -72,7 +72,7 @@ function buildPdfFromImages(images) {
     const content = `q\n595 0 0 842 0 0 cm\n/Im${index + 1} Do\nQ`;
     const contentLength = encoder.encode(content).length;
     const contentId = addObject(`<< /Length ${contentLength} >>\nstream\n${content}\nendstream`);
-    const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /XObject << /Im${index + 1} ${imageId} 0 R >> >> >> /Contents ${contentId} 0 R >>`);
+    const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 595 842] /Resources << /ProcSet [/PDF /ImageC] /XObject << /Im${index + 1} ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`);
     pageIds.push(pageId);
   });
 
@@ -244,6 +244,7 @@ async function buildPendingProductsPdf(products) {
 export default function PendingProductsPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => {
@@ -289,15 +290,22 @@ export default function PendingProductsPage() {
   }, [orders]);
 
   async function handleDownloadPdf() {
-    const pdf = await buildPendingProductsPdf(pendingProducts);
-    const url = URL.createObjectURL(pdf);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `pending-products-${new Date().toISOString().slice(0, 10)}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    setDownloadingPdf(true);
+    try {
+      const pdf = await buildPendingProductsPdf(pendingProducts);
+      const url = URL.createObjectURL(pdf);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `pending-products-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000);
+    } catch (error) {
+      setToast({ type: "error", message: error.message || "Could not download pending products PDF." });
+    } finally {
+      setDownloadingPdf(false);
+    }
   }
 
   return (
@@ -315,11 +323,11 @@ export default function PendingProductsPage() {
           <button
             type="button"
             onClick={handleDownloadPdf}
-            disabled={loading || !pendingProducts.length}
+            disabled={loading || downloadingPdf || !pendingProducts.length}
             className="flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <Download size={17} />
-            PDF
+            {downloadingPdf ? <Loader2 className="animate-spin" size={17} /> : <Download size={17} />}
+            {downloadingPdf ? "PDF..." : "PDF"}
           </button>
         </header>
 
