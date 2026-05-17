@@ -62,14 +62,14 @@ export default function PendingProductsPage() {
   return (
     <main className="min-h-screen safe-bottom">
       <Toast toast={toast} onClose={() => setToast(null)} />
-      <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6 lg:px-8">
-        <header className="mb-5 flex items-center gap-3">
-          <Link href="/" className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a]" aria-label="Back">
+      <div className="mx-auto max-w-4xl px-3 py-3 sm:px-5 lg:px-6">
+        <header className="sticky top-0 z-20 -mx-3 mb-3 flex items-center gap-3 border-b border-black/5 bg-limewash/95 px-3 py-2 backdrop-blur dark:border-white/5 dark:bg-[#101714]/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+          <Link href="/" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a]" aria-label="Back">
             <ArrowLeft size={18} />
           </Link>
           <div className="min-w-0 flex-1">
             <StoreBrand compact />
-            <h1 className="mt-2 text-xl font-black">Pending Product Details</h1>
+            <h1 className="mt-1 text-lg font-black">Pending Product Details</h1>
           </div>
         </header>
 
@@ -78,11 +78,13 @@ export default function PendingProductsPage() {
             <Loader2 className="animate-spin text-leaf" size={34} />
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="grid gap-1.5">
             {pendingProducts.map((product) => (
-              <section key={product.key} className="flex items-center justify-between gap-3 rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
+              <section key={product.key} className="flex min-h-14 items-center justify-between gap-3 rounded-lg bg-white px-3 py-2.5 shadow-sm dark:bg-[#151f1a] sm:min-h-12 sm:py-2">
                 <p className="min-w-0 flex-1 text-sm font-bold leading-snug">{product.productName}</p>
-                <p className="shrink-0 text-sm font-black">{formatQty(product.pendingQuantity)}</p>
+                <p className="shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-sm font-black text-amber-800 dark:bg-amber-950 dark:text-amber-100">
+                  {formatQty(product.pendingQuantity)}
+                </p>
               </section>
             ))}
             {!pendingProducts.length && (

@@ -54,14 +54,14 @@ export default function PendingDetailsPage() {
   return (
     <main className="min-h-screen safe-bottom">
       <Toast toast={toast} onClose={() => setToast(null)} />
-      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
-        <header className="mb-5 flex items-center gap-3">
-          <Link href="/" className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a]" aria-label="Back">
+      <div className="mx-auto max-w-6xl px-3 py-3 sm:px-5 lg:px-6">
+        <header className="sticky top-0 z-20 -mx-3 mb-3 flex items-center gap-3 border-b border-black/5 bg-limewash/95 px-3 py-2 backdrop-blur dark:border-white/5 dark:bg-[#101714]/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+          <Link href="/" className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a]" aria-label="Back">
             <ArrowLeft size={18} />
           </Link>
           <div className="min-w-0 flex-1">
             <StoreBrand compact />
-            <h1 className="mt-2 text-xl font-black">Pending Order Details</h1>
+            <h1 className="mt-1 text-lg font-black">Pending Order Details</h1>
           </div>
         </header>
 
@@ -70,54 +70,50 @@ export default function PendingDetailsPage() {
             <Loader2 className="animate-spin text-leaf" size={34} />
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {stats.pendingOrders.map((order) => {
               const pendingItems = getPendingItems(order);
               const pendingQuantity = pendingItems.reduce((sum, item) => sum + item.pendingQuantity, 0);
 
               return (
-                <section key={order._id} className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
-                  <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-                    <div>
+                <section key={order._id} className="rounded-lg bg-white p-3 shadow-sm dark:bg-[#151f1a]">
+                  <div className="mb-3 grid gap-2 sm:flex sm:items-center sm:justify-between">
+                    <div className="min-w-0 flex-1">
                       <p className="text-xs uppercase tracking-wide text-black/45 dark:text-white/45">Invoice</p>
-                      <h2 className="text-lg font-black">{order.invoiceNo}</h2>
-                      <p className="mt-1 text-sm text-black/60 dark:text-white/60">{order.customerName}</p>
+                      <h2 className="truncate text-base font-black">{order.invoiceNo}</h2>
+                      <p className="truncate text-sm text-black/60 dark:text-white/60">{order.customerName}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">
                         {formatQty(pendingQuantity)} pending
                       </span>
-                      <Link href={`/orders/${order._id}`} className="rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white">
-                        Open Order
+                      <Link href={`/orders/${order._id}`} className="grid min-h-11 flex-1 place-items-center rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white sm:flex-none">
+                        Open
                       </Link>
                     </div>
                   </div>
 
-                  <div className="grid gap-2">
+                  <div className="grid gap-1.5">
                     {pendingItems.map((item) => (
                       <div
                         key={`${order._id}-${item.itemIndex}-${item.productId?._id || item.productId || item.hsnOrBarcode || item.productName}`}
-                        className="rounded-lg bg-limewash p-3 dark:bg-white/5"
+                        className="grid min-h-12 grid-cols-[1fr_auto] items-center gap-2 rounded-lg bg-limewash px-3 py-2 dark:bg-white/5 sm:grid-cols-[1fr_72px_72px_82px]"
                       >
-                        <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-                          <p className="min-w-0 flex-1 text-sm font-bold leading-snug">{item.productName}</p>
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100">
-                            {formatQty(item.pendingQuantity)} pending
-                          </span>
+                        <p className="min-w-0 truncate text-sm font-bold leading-snug">{item.productName}</p>
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-right text-xs font-bold text-amber-800 dark:bg-amber-950 dark:text-amber-100 sm:hidden">
+                          {formatQty(item.pendingQuantity)}
+                        </span>
+                        <div className="hidden text-xs sm:block">
+                          <p className="text-black/45 dark:text-white/45">Req</p>
+                          <p className="font-bold">{formatQty(item.quantity)}</p>
                         </div>
-                        <div className="grid grid-cols-3 gap-2 text-xs">
-                          <div>
-                            <p className="text-black/45 dark:text-white/45">Required</p>
-                            <p className="font-bold">{formatQty(item.quantity)}</p>
-                          </div>
-                          <div>
-                            <p className="text-black/45 dark:text-white/45">Packed</p>
-                            <p className="font-bold">{formatQty(item.packedQuantity)}</p>
-                          </div>
-                          <div>
-                            <p className="text-black/45 dark:text-white/45">Pending</p>
-                            <p className="font-bold">{formatQty(item.pendingQuantity)}</p>
-                          </div>
+                        <div className="hidden text-xs sm:block">
+                          <p className="text-black/45 dark:text-white/45">Packed</p>
+                          <p className="font-bold">{formatQty(item.packedQuantity)}</p>
+                        </div>
+                        <div className="hidden text-xs sm:block">
+                          <p className="text-black/45 dark:text-white/45">Pending</p>
+                          <p className="font-bold">{formatQty(item.pendingQuantity)}</p>
                         </div>
                       </div>
                     ))}
