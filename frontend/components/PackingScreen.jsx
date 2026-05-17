@@ -54,6 +54,13 @@ function playScanSound(result) {
     return;
   }
 
+  if (result === "complete") {
+    playTone(audioContext, { frequency: 659.25, start: now, duration: 0.08, type: "triangle", gain: 0.24 });
+    playTone(audioContext, { frequency: 880, start: now + 0.08, duration: 0.08, type: "triangle", gain: 0.25 });
+    playTone(audioContext, { frequency: 1174.66, start: now + 0.16, duration: 0.14, type: "triangle", gain: 0.27 });
+    return;
+  }
+
   playTone(audioContext, { frequency: 220, start: now, duration: 0.16, type: "sawtooth", gain: 0.28 });
   playTone(audioContext, { frequency: 138.59, start: now + 0.13, duration: 0.2, type: "square", gain: 0.26 });
 }
@@ -106,7 +113,8 @@ export default function PackingScreen({ orderId }) {
       setPartyName(data.order?.customerName || "");
       setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
       setToast({ type: "success", message: data.message || "Item packed" });
-      playScanSound("correct");
+      const completedQuantity = data.message === "Qty completed" || data.message === "Order completed";
+      playScanSound(completedQuantity ? "complete" : "correct");
       window.navigator.vibrate?.(70);
       setTimeout(() => setLastPackedItemId(null), 900);
     } catch (error) {
