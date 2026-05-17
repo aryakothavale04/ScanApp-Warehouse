@@ -261,6 +261,7 @@ export default function PackingScreen({ orderId }) {
       onRemovePacked={handleRemovePackedItem}
       onUpdateItem={handleUpdateItem}
       onError={(message) => setToast({ type: "error", message })}
+      scanningMode={scannerActive}
     />
   );
 
