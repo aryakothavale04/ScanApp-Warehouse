@@ -9,8 +9,9 @@ function normalize(value = "") {
 }
 
 export async function findProductForInvoiceName(productName, hsnOrBarcode) {
-  if (hsnOrBarcode) {
-    const product = await Product.findOne({ barcode: hsnOrBarcode.toString().trim() }).lean();
+  const barcode = hsnOrBarcode?.toString().trim();
+  if (barcode) {
+    const product = await Product.findOne({ barcode }).lean();
     if (product) return product;
   }
 
@@ -27,12 +28,17 @@ export async function findProductForInvoiceName(productName, hsnOrBarcode) {
 export async function hydrateInvoiceItems(items) {
   const hydrated = [];
 
-  for (const item of items) {
+  for (const item of items || []) {
+    if (!item?.productName || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+      console.warn("Failed row:", item);
+      continue;
+    }
+
     const product = await findProductForInvoiceName(item.productName, item.hsnOrBarcode);
     hydrated.push({
       productId: product?._id,
       productName: product?.productName || item.productName,
-      hsnOrBarcode: item.hsnOrBarcode,
+      hsnOrBarcode: item.hsnOrBarcode || "",
       quantity: item.quantity,
       pricePerUnit: item.pricePerUnit,
       totalAmount: item.totalAmount,

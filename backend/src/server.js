@@ -4,6 +4,14 @@ import { connectDb } from "./config/db.js";
 
 dotenv.config();
 
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught exception:", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled rejection:", reason);
+});
+
 const startServer = async () => {
   try {
     const port = process.env.PORT || 5000;

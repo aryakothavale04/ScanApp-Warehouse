@@ -162,25 +162,47 @@ export async function removePackedOrderItem(req, res) {
 }
 
 export async function uploadInvoice(req, res) {
-  if (!req.file?.buffer) {
-    return res.status(400).json({ message: "Invoice PDF is required" });
+  try {
+    if (!req.file?.buffer) {
+      return res.status(400).json({ success: false, message: "Invoice PDF is required" });
+    }
+
+    const parsed = await parseVyaparInvoice(req.file.buffer);
+    if (!parsed?.invoiceNo || !Array.isArray(parsed.items) || parsed.items.length === 0) {
+      console.error("Parser error:", new Error("Parsed invoice payload is missing required fields"));
+      return res.status(422).json({ success: false, message: "Unsupported invoice format" });
+    }
+
+    const existing = await Order.findOne({ invoiceNo: parsed.invoiceNo });
+    if (existing) {
+      return res.status(409).json({ success: false, message: `Invoice ${parsed.invoiceNo} already exists` });
+    }
+
+    const safeItems = parsed.items.filter((item) => {
+      const valid = item?.productName && Number.isFinite(item.quantity) && item.quantity > 0;
+      if (!valid) {
+        console.warn("Failed row:", item);
+      }
+      return valid;
+    });
+
+    if (!safeItems.length) {
+      return res.status(422).json({ success: false, message: "Unsupported invoice format" });
+    }
+
+    const items = await hydrateInvoiceItems(safeItems);
+    const order = await Order.create({
+      invoiceNo: parsed.invoiceNo,
+      customerName: parsed.customerName || "Walk-in Customer",
+      items
+    });
+
+    const populated = await populateOrder(Order.findById(order._id));
+    return res.status(201).json(populated);
+  } catch (error) {
+    console.error("Parser error:", error);
+    return res.status(422).json({ success: false, message: "Unsupported invoice format" });
   }
-
-  const parsed = await parseVyaparInvoice(req.file.buffer);
-  const existing = await Order.findOne({ invoiceNo: parsed.invoiceNo });
-  if (existing) {
-    return res.status(409).json({ message: `Invoice ${parsed.invoiceNo} already exists` });
-  }
-
-  const items = await hydrateInvoiceItems(parsed.items);
-  const order = await Order.create({
-    invoiceNo: parsed.invoiceNo,
-    customerName: parsed.customerName,
-    items
-  });
-
-  const populated = await populateOrder(Order.findById(order._id));
-  res.status(201).json(populated);
 }
 
 export async function scanBarcode(req, res) {
