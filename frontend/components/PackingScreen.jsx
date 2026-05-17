@@ -270,16 +270,31 @@ export default function PackingScreen({ orderId }) {
     <main className="min-h-screen safe-bottom">
       <Toast toast={toast} onClose={() => setToast(null)} />
       <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
-        <header className="mb-4 flex items-center justify-between gap-3">
+        <header className={`${scannerActive ? "mb-2" : "mb-4"} flex items-center justify-between gap-2`}>
           <Link href="/" className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a]" aria-label="Back">
             <ArrowLeft size={18} />
           </Link>
-          <div className="min-w-0 flex-1">
-            <StoreBrand compact />
-            <p className="mt-1 truncate text-xs text-black/55 dark:text-white/55">
-              {order.customerName} - Invoice {order.invoiceNo}
-            </p>
-          </div>
+          {scannerActive ? (
+            <>
+              <p className="min-w-0 flex-1 truncate text-xs font-bold text-black/70 dark:text-white/70">
+                {order.customerName} - Invoice {order.invoiceNo}
+              </p>
+              <button
+                onClick={() => setScannerActive(false)}
+                className="flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white"
+              >
+                <Square size={15} />
+                Stop
+              </button>
+            </>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <StoreBrand compact />
+              <p className="mt-1 truncate text-xs text-black/55 dark:text-white/55">
+                {order.customerName} - Invoice {order.invoiceNo}
+              </p>
+            </div>
+          )}
         </header>
 
         {packed && (
@@ -293,18 +308,9 @@ export default function PackingScreen({ orderId }) {
         )}
 
         {scannerActive ? (
-          <div className="space-y-4">
-            <div className="sticky top-0 z-20 -mx-4 border-b border-black/5 bg-limewash/95 px-4 py-2 backdrop-blur dark:border-white/5 dark:bg-[#101714]/95 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-              <button
-                onClick={() => setScannerActive(false)}
-                className="ml-auto flex min-h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white"
-              >
-                <Square size={15} />
-                Stop
-              </button>
-            </div>
+          <div className="space-y-3">
             <div className="grid gap-3 lg:grid-cols-[280px_1fr] lg:items-start">
-              <div className="mx-auto w-full max-w-[280px] lg:sticky lg:top-14">
+              <div className="mx-auto w-full max-w-[280px] lg:sticky lg:top-3">
                 {scanner}
               </div>
               {checklist}
