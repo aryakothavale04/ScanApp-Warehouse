@@ -74,6 +74,27 @@ function getOrderItemByIndex(order, itemIndex) {
   return order.items[index];
 }
 
+function hasSuspiciousInvoiceItems(items = []) {
+  if (!items.length) return true;
+
+  return items.some((item) => {
+    const name = item?.productName?.toString().trim() || "";
+    const line = item?.invoiceLine?.toString().trim() || "";
+    const hasMoney = Number.isFinite(item?.pricePerUnit) && item.pricePerUnit > 0 && Number.isFinite(item?.totalAmount) && item.totalAmount > 0;
+    const hasQuantity = Number.isFinite(item?.quantity) && item.quantity > 0;
+
+    return (
+      !name ||
+      !hasMoney ||
+      !hasQuantity ||
+      name.length > 140 ||
+      /^\d+(?:\.\d+)?$/.test(name) ||
+      /^#?\s*(item|qty|quantity|price|amount|total|hsn|barcode)\b/i.test(name) ||
+      (line && line.length > 280)
+    );
+  });
+}
+
 export async function listOrders(req, res) {
   const orders = await populateOrder(Order.find({}).sort({ createdAt: -1 }));
   res.json({ orders });
@@ -271,6 +292,14 @@ export async function uploadInvoice(req, res) {
 
     if (!safeItems.length) {
       return res.status(422).json({ success: false, message: "Unsupported invoice format" });
+    }
+
+    if (hasSuspiciousInvoiceItems(safeItems)) {
+      console.warn("Suspicious invoice parse rejected:", safeItems);
+      return res.status(422).json({
+        success: false,
+        message: "Could not read clean invoice items. Please upload the original Vyapar PDF instead of a shared, scanned, or compressed copy."
+      });
     }
 
     const items = await hydrateInvoiceItems(safeItems);

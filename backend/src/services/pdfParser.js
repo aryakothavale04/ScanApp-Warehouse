@@ -136,12 +136,28 @@ function chunkVyaparRows(lines) {
   const rows = [];
   let current = null;
 
+  const isCurrentRowComplete = () => {
+    if (!current?.parts.length) return false;
+    return Boolean(parseVyaparRow(current.parts.join(" ")));
+  };
+
   for (const line of getItemSectionLines(lines)) {
     const serialMatch = line.match(/^(\d{1,3})(?![\d,])\s*(.*)$/);
     if (serialMatch) {
-      if (current?.parts.length) rows.push(current.parts.join(" "));
-      current = { parts: [] };
-      if (serialMatch[2]) current.parts.push(serialMatch[2]);
+      if (!current) {
+        current = { parts: [] };
+        if (serialMatch[2]) current.parts.push(serialMatch[2]);
+        continue;
+      }
+
+      if (isCurrentRowComplete()) {
+        rows.push(current.parts.join(" "));
+        current = { parts: [] };
+        if (serialMatch[2]) current.parts.push(serialMatch[2]);
+        continue;
+      }
+
+      current.parts.push(line);
       continue;
     }
 
