@@ -116,8 +116,11 @@ export default function AdminDashboard() {
           })}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
-          <section className="order-1">
+        <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
+          <div>
+            <UploadInvoice onUploaded={loadOrders} onToast={setToast} />
+          </div>
+          <section>
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-base font-bold">Pending Orders</h2>
               <button onClick={loadOrders} className="min-h-11 rounded-lg border border-black/10 px-4 py-2 text-sm font-semibold dark:border-white/10">
@@ -143,9 +146,6 @@ export default function AdminDashboard() {
               </div>
             )}
           </section>
-          <div className="order-2 lg:order-none">
-            <UploadInvoice onUploaded={loadOrders} onToast={setToast} />
-          </div>
         </div>
         <section id="completed-orders" className="mt-5 sm:mt-6">
           <div className="mb-2 flex items-center justify-between">
