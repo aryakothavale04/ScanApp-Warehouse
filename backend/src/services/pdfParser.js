@@ -117,6 +117,124 @@ function parseAmountTail(line) {
   };
 }
 
+function getItemSectionLines(lines) {
+  const startIndex = lines.findIndex((line) => /^#\s*item\s*name/i.test(line));
+  const stopPattern = /invoice amount in words|payment type|amounts|sub total|round off|total|balance|bank details/i;
+  if (startIndex < 0) return [];
+
+  const section = [];
+  for (let index = startIndex + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (stopPattern.test(line)) break;
+    section.push(line);
+  }
+
+  return section;
+}
+
+function chunkVyaparRows(lines) {
+  const rows = [];
+  let current = null;
+
+  for (const line of getItemSectionLines(lines)) {
+    const serialMatch = line.match(/^(\d{1,3})(?![\d,])\s*(.*)$/);
+    if (serialMatch) {
+      if (current?.parts.length) rows.push(current.parts.join(" "));
+      current = { parts: [] };
+      if (serialMatch[2]) current.parts.push(serialMatch[2]);
+      continue;
+    }
+
+    if (!current) continue;
+    current.parts.push(line);
+  }
+
+  if (current?.parts.length) rows.push(current.parts.join(" "));
+  return rows;
+}
+
+function extractVyaparAmounts(row) {
+  const currencyNumbers = [...row.matchAll(/₹\s*([\d,]+(?:\.\d+)?)/g)];
+  if (currencyNumbers.length >= 2) {
+    const priceMatch = currencyNumbers.at(-2);
+    const totalMatch = currencyNumbers.at(-1);
+    return {
+      pricePerUnit: toNumber(priceMatch[1]),
+      totalAmount: toNumber(totalMatch[1]),
+      beforeAmounts: row.slice(0, priceMatch.index).trim()
+    };
+  }
+
+  const matches = [...row.matchAll(/[\d,]+(?:\.\d+)?/g)];
+  if (matches.length < 2) return null;
+
+  const priceMatch = matches.at(-2);
+  const totalMatch = matches.at(-1);
+  return {
+    pricePerUnit: toNumber(priceMatch[0]),
+    totalAmount: toNumber(totalMatch[0]),
+    beforeAmounts: row.slice(0, priceMatch.index).trim()
+  };
+}
+
+function extractQuantityFromName(name) {
+  const packMatch = name.match(/(?:₹\s*)?\d+(?:\.\d+)?\s*[x×X]\s*(\d+(?:\.\d+)?)/);
+  return packMatch ? toNumber(packMatch[1]) : null;
+}
+
+function parseVyaparRow(row) {
+  const amounts = extractVyaparAmounts(row);
+  if (!amounts || amounts.pricePerUnit <= 0 || amounts.totalAmount <= 0) return null;
+
+  const inferredQuantity = amounts.totalAmount / amounts.pricePerUnit;
+  const roundedInferredQuantity = Math.round(inferredQuantity);
+  const tailBarcodeMatch = amounts.beforeAmounts.match(/(\d{6,})(\d{1,3})?$/);
+  const explicitPackQuantity = extractQuantityFromName(amounts.beforeAmounts);
+
+  let hsnOrBarcode = "";
+  let quantity = Number.isFinite(explicitPackQuantity) && explicitPackQuantity > 0 ? explicitPackQuantity : null;
+  let productName = amounts.beforeAmounts;
+
+  if (tailBarcodeMatch) {
+    const compactCode = tailBarcodeMatch[0];
+    const inferredText = Number.isFinite(roundedInferredQuantity) ? roundedInferredQuantity.toString() : "";
+    if (
+      inferredText &&
+      compactCode.endsWith(inferredText) &&
+      Math.abs(inferredQuantity - roundedInferredQuantity) < 0.001 &&
+      compactCode.length - inferredText.length >= 6
+    ) {
+      hsnOrBarcode = compactCode.slice(0, -inferredText.length);
+      quantity = roundedInferredQuantity;
+    } else {
+      hsnOrBarcode = compactCode;
+    }
+
+    productName = amounts.beforeAmounts.slice(0, tailBarcodeMatch.index).trim();
+
+    if (hsnOrBarcode.length > 13 && productName.endsWith("₹")) {
+      const leadingNameDigits = hsnOrBarcode.slice(0, -13);
+      hsnOrBarcode = hsnOrBarcode.slice(-13);
+      productName = `${productName}${leadingNameDigits}`.trim();
+    }
+  }
+
+  return buildItem(
+    productName,
+    hsnOrBarcode,
+    quantity,
+    amounts.pricePerUnit,
+    amounts.totalAmount,
+    row
+  );
+}
+
+function extractVyaparItems(lines) {
+  return chunkVyaparRows(lines)
+    .map(parseVyaparRow)
+    .filter(Boolean);
+}
+
 function pushItem(itemLines, item, row) {
   if (item) {
     itemLines.push(item);
@@ -127,6 +245,9 @@ function pushItem(itemLines, item, row) {
 }
 
 function extractItems(lines) {
+  const vyaparItems = extractVyaparItems(lines);
+  if (vyaparItems.length) return vyaparItems;
+
   const itemLines = [];
   const detailPattern = /^([A-Z0-9\-/]+)\s*(?:(\d+(?:\.\d+)?)\s+)?[^\d]*([\d,]+(?:\.\d+)?)\s+[^\d]*([\d,]+(?:\.\d+)?)/i;
   const combinedPattern = /^(\d+)\s*(.+?)\s+([A-Z0-9\-/]+)\s*(?:(\d+(?:\.\d+)?)\s+)?[^\d]*([\d,]+(?:\.\d+)?)\s+[^\d]*([\d,]+(?:\.\d+)?)/i;
