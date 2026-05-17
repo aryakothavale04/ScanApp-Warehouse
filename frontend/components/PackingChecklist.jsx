@@ -87,12 +87,14 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
 
   return (
     <section className="space-y-4">
+      {!scanningMode && (
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold">Product Checklist</h2>
         <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-semibold dark:bg-white/10">
           Missing {missing.length}
         </span>
       </div>
+      )}
 
       <div className={scanningMode ? "grid gap-2" : "grid gap-3"}>
         {visibleItems.map(({ item = {}, index }) => {

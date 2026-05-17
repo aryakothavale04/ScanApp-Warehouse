@@ -246,6 +246,7 @@ export default function PackingScreen({ orderId }) {
   const scanner = scannerActive ? (
     <BarcodeScanner
       active={scannerActive}
+      compact
       onScan={handleScan}
       onError={(message) => {
         setToast({ type: "error", message });
@@ -293,11 +294,21 @@ export default function PackingScreen({ orderId }) {
 
         {scannerActive ? (
           <div className="space-y-4">
-            <div className="space-y-3">
-              {scanner}
-              {scannerButton}
+            <div className="sticky top-0 z-20 -mx-4 border-b border-black/5 bg-limewash/95 px-4 py-2 backdrop-blur dark:border-white/5 dark:bg-[#101714]/95 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+              <button
+                onClick={() => setScannerActive(false)}
+                className="ml-auto flex min-h-9 items-center justify-center gap-2 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white"
+              >
+                <Square size={15} />
+                Stop
+              </button>
             </div>
-            {checklist}
+            <div className="grid gap-3 lg:grid-cols-[280px_1fr] lg:items-start">
+              <div className="mx-auto w-full max-w-[280px] lg:sticky lg:top-14">
+                {scanner}
+              </div>
+              {checklist}
+            </div>
             <section className="grid gap-3 rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a] sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <ProgressRing packed={progress.packedQuantity} total={progress.totalQuantity} />

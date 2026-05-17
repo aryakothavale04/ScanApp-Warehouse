@@ -3,7 +3,7 @@
 import { Camera, CameraOff, ScanLine } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-export default function BarcodeScanner({ active, onScan, onError }) {
+export default function BarcodeScanner({ active, onScan, onError, compact = false }) {
   const scannerRef = useRef(null);
   const onScanRef = useRef(onScan);
   const onErrorRef = useRef(onError);
@@ -77,6 +77,7 @@ export default function BarcodeScanner({ active, onScan, onError }) {
 
   return (
     <section className="overflow-hidden rounded-lg bg-ink text-white shadow-soft dark:bg-black">
+      {!compact && (
       <div className="flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
           <ScanLine size={20} />
@@ -90,10 +91,11 @@ export default function BarcodeScanner({ active, onScan, onError }) {
           {ready ? "Live" : "Starting"}
         </span>
       </div>
-      <div className="relative min-h-[280px] bg-black">
-        <div id="barcode-reader" className="min-h-[280px] w-full" />
-        <div className="pointer-events-none absolute inset-x-8 top-1/2 h-28 -translate-y-1/2 rounded-lg border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.36)]" />
-        <div className="pointer-events-none absolute inset-x-12 top-1/2 h-0.5 -translate-y-1/2 bg-saffron shadow-[0_0_18px_rgba(245,165,36,0.95)]" />
+      )}
+      <div className={`relative bg-black ${compact ? "aspect-square min-h-0" : "min-h-[280px]"}`}>
+        <div id="barcode-reader" className={compact ? "h-full w-full" : "min-h-[280px] w-full"} />
+        <div className={`pointer-events-none absolute top-1/2 -translate-y-1/2 rounded-lg border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.36)] ${compact ? "inset-x-8 h-24" : "inset-x-8 h-28"}`} />
+        <div className={`pointer-events-none absolute top-1/2 h-0.5 -translate-y-1/2 bg-saffron shadow-[0_0_18px_rgba(245,165,36,0.95)] ${compact ? "inset-x-12" : "inset-x-12"}`} />
       </div>
     </section>
   );
