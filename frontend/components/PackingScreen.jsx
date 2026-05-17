@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Loader2, Play, Square } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Play, Plus, Save, Square, UserRound } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/src/lib/api";
 import BarcodeScanner from "./BarcodeScanner";
@@ -25,14 +25,14 @@ function armScanAudio() {
   audioContext?.resume?.();
 }
 
-function playTone(audioContext, { frequency, start, duration, type = "sine", gain = 0.12 }) {
+function playTone(audioContext, { frequency, start, duration, type = "sine", gain = 0.28 }) {
   const oscillator = audioContext.createOscillator();
   const envelope = audioContext.createGain();
 
   oscillator.type = type;
   oscillator.frequency.setValueAtTime(frequency, start);
   envelope.gain.setValueAtTime(0.001, start);
-  envelope.gain.exponentialRampToValueAtTime(gain, start + 0.015);
+  envelope.gain.exponentialRampToValueAtTime(gain, start + 0.006);
   envelope.gain.exponentialRampToValueAtTime(0.001, start + duration);
 
   oscillator.connect(envelope);
@@ -49,13 +49,13 @@ function playScanSound(result) {
   const now = audioContext.currentTime;
 
   if (result === "correct") {
-    playTone(audioContext, { frequency: 659.25, start: now, duration: 0.11, gain: 0.1 });
-    playTone(audioContext, { frequency: 987.77, start: now + 0.1, duration: 0.16, gain: 0.11 });
+    playTone(audioContext, { frequency: 880, start: now, duration: 0.08, gain: 0.24 });
+    playTone(audioContext, { frequency: 1320, start: now + 0.07, duration: 0.1, gain: 0.26 });
     return;
   }
 
-  playTone(audioContext, { frequency: 185, start: now, duration: 0.14, type: "sawtooth", gain: 0.09 });
-  playTone(audioContext, { frequency: 146.83, start: now + 0.15, duration: 0.18, type: "sawtooth", gain: 0.08 });
+  playTone(audioContext, { frequency: 220, start: now, duration: 0.16, type: "sawtooth", gain: 0.28 });
+  playTone(audioContext, { frequency: 138.59, start: now + 0.13, duration: 0.2, type: "square", gain: 0.26 });
 }
 
 export default function PackingScreen({ orderId }) {
@@ -65,12 +65,17 @@ export default function PackingScreen({ orderId }) {
   const [toast, setToast] = useState(null);
   const [lastPackedItemId, setLastPackedItemId] = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
+  const [partyName, setPartyName] = useState("");
+  const [itemDraft, setItemDraft] = useState({ productName: "", quantity: 1, barcode: "" });
+  const [savingParty, setSavingParty] = useState(false);
+  const [addingItem, setAddingItem] = useState(false);
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
     try {
       const data = await api.order(orderId);
       setOrder(data.order);
+      setPartyName(data.order?.customerName || "");
     } catch (error) {
       setToast({ type: "error", message: error.message });
     } finally {
@@ -93,6 +98,7 @@ export default function PackingScreen({ orderId }) {
     try {
       const data = await api.scan(orderId, barcode);
       setOrder(data.order);
+      setPartyName(data.order?.customerName || "");
       setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
       setToast({ type: "success", message: data.message || "Item packed" });
       playScanSound("correct");
@@ -110,12 +116,14 @@ export default function PackingScreen({ orderId }) {
   const handleUpdateItem = useCallback(async (itemIndex, item) => {
     const data = await api.updateOrderItem(orderId, itemIndex, item);
     setOrder(data.order);
+    setPartyName(data.order?.customerName || "");
     setToast({ type: "success", message: data.message || "Item updated" });
   }, [orderId]);
 
   const handleManualPackItem = useCallback(async (itemIndex) => {
     const data = await api.manualPackOrderItem(orderId, itemIndex);
     setOrder(data.order);
+    setPartyName(data.order?.customerName || "");
     setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
     setToast({ type: "success", message: data.message || "Item packed" });
     playScanSound("correct");
@@ -126,8 +134,39 @@ export default function PackingScreen({ orderId }) {
   const handleRemovePackedItem = useCallback(async (itemIndex) => {
     const data = await api.removePackedOrderItem(orderId, itemIndex);
     setOrder(data.order);
+    setPartyName(data.order?.customerName || "");
     setToast({ type: "success", message: data.message || "Packed item removed" });
   }, [orderId]);
+
+  const handleSavePartyName = useCallback(async () => {
+    setSavingParty(true);
+    try {
+      const data = await api.updateOrder(orderId, { customerName: partyName });
+      setOrder(data.order);
+      setPartyName(data.order?.customerName || "");
+      setToast({ type: "success", message: data.message || "Party name updated" });
+    } catch (error) {
+      setToast({ type: "error", message: error.message });
+    } finally {
+      setSavingParty(false);
+    }
+  }, [orderId, partyName]);
+
+  const handleAddItem = useCallback(async (event) => {
+    event.preventDefault();
+    setAddingItem(true);
+    try {
+      const data = await api.addOrderItem(orderId, itemDraft);
+      setOrder(data.order);
+      setPartyName(data.order?.customerName || "");
+      setItemDraft({ productName: "", quantity: 1, barcode: "" });
+      setToast({ type: "success", message: data.message || "Item added" });
+    } catch (error) {
+      setToast({ type: "error", message: error.message });
+    } finally {
+      setAddingItem(false);
+    }
+  }, [itemDraft, orderId]);
 
   if (loading) {
     return (
@@ -145,7 +184,7 @@ export default function PackingScreen({ orderId }) {
     );
   }
 
-  const packed = order.packedStatus === "Packed";
+  const packed = order.packedStatus === "Completed" || order.packedStatus === "Packed";
 
   return (
     <main className="min-h-screen safe-bottom">
@@ -167,8 +206,8 @@ export default function PackingScreen({ orderId }) {
           <section className="mb-4 flex items-center gap-3 rounded-lg bg-emerald-600 p-4 text-white shadow-soft">
             <CheckCircle2 size={28} />
             <div>
-              <p className="font-black">Order Packed</p>
-              <p className="text-sm text-white/80">सर्व माल पॅक झाला आहे.</p>
+              <p className="font-black">Order Completed</p>
+              <p className="text-sm text-white/80">All items are packed and saved for history.</p>
             </div>
           </section>
         )}
@@ -188,11 +227,79 @@ export default function PackingScreen({ orderId }) {
                 {scannerActive ? "Stop Scanner" : "Start Scanner"}
               </button>
             </section>
+            <section className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
+              <div className="mb-3 flex items-center gap-2">
+                <UserRound size={18} />
+                <h2 className="font-bold">Party Name</h2>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  value={partyName}
+                  onChange={(event) => setPartyName(event.target.value)}
+                  className="min-w-0 flex-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                  aria-label="Party name"
+                />
+                <button
+                  type="button"
+                  onClick={handleSavePartyName}
+                  disabled={savingParty}
+                  className="grid h-10 w-10 place-items-center rounded-lg bg-leaf text-white disabled:opacity-60"
+                  aria-label="Save party name"
+                  title="Save party name"
+                >
+                  {savingParty ? <Loader2 className="animate-spin" size={17} /> : <Save size={17} />}
+                </button>
+              </div>
+            </section>
+            <section className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
+              <div className="mb-3 flex items-center gap-2">
+                <Plus size={18} />
+                <h2 className="font-bold">Add Item</h2>
+              </div>
+              <form onSubmit={handleAddItem} className="grid gap-2">
+                <input
+                  value={itemDraft.productName}
+                  onChange={(event) => setItemDraft((current) => ({ ...current, productName: event.target.value }))}
+                  className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                  placeholder="Product name"
+                  aria-label="Product name"
+                />
+                <div className="grid grid-cols-[110px_1fr] gap-2">
+                  <input
+                    type="number"
+                    min="0.001"
+                    step="0.001"
+                    value={itemDraft.quantity}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, quantity: event.target.value }))}
+                    className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                    aria-label="Quantity"
+                  />
+                  <input
+                    value={itemDraft.barcode}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, barcode: event.target.value }))}
+                    className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                    placeholder="Barcode optional"
+                    aria-label="Barcode optional"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={addingItem}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                >
+                  {addingItem ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+                  Add Item
+                </button>
+              </form>
+            </section>
             {scannerActive && (
               <BarcodeScanner
                 active={scannerActive}
                 onScan={handleScan}
-                onError={(message) => setToast({ type: "error", message })}
+                onError={(message) => {
+                  setToast({ type: "error", message });
+                  playScanSound("wrong");
+                }}
               />
             )}
           </div>

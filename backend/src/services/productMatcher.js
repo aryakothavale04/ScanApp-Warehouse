@@ -3,9 +3,11 @@ import { Product } from "../models/Product.js";
 function normalize(value = "") {
   return value
     .toString()
+    .normalize("NFKC")
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, " ");
+    .replace(/[×✕✖]/g, "x")
+    .replace(/[^a-z0-9]+/g, "");
 }
 
 export async function findProductForInvoiceName(productName, hsnOrBarcode) {

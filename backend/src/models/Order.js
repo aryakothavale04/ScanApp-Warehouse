@@ -21,7 +21,7 @@ const orderSchema = new mongoose.Schema(
     items: [orderItemSchema],
     packedStatus: {
       type: String,
-      enum: ["Pending", "Packed"],
+      enum: ["Pending", "Packed", "Completed"],
       default: "Pending",
       index: true
     }
@@ -31,7 +31,7 @@ const orderSchema = new mongoose.Schema(
 
 orderSchema.methods.recalculateStatus = function recalculateStatus() {
   const complete = this.items.length > 0 && this.items.every((item) => item.packedQuantity >= item.quantity);
-  this.packedStatus = complete ? "Packed" : "Pending";
+  this.packedStatus = complete ? "Completed" : "Pending";
 };
 
 orderSchema.virtual("progress").get(function progress() {

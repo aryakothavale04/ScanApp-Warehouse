@@ -38,6 +38,10 @@ export const api = {
   test: () => request("/api/test"),
   orders: () => request("/api/orders"),
   order: (id) => request(`/api/orders/${id}`),
+  updateOrder: (id, order) =>
+    request(`/api/orders/${id}`, "patch", {
+      data: order
+    }),
   deleteOrder: (id) => request(`/api/orders/${id}`, "delete"),
   uploadInvoice: (file) => {
     const formData = new FormData();
@@ -53,6 +57,10 @@ export const api = {
     }),
   updateOrderItem: (orderId, itemIndex, item) =>
     request(`/api/orders/${orderId}/items/${itemIndex}`, "patch", {
+      data: item
+    }),
+  addOrderItem: (orderId, item) =>
+    request(`/api/orders/${orderId}/items`, "post", {
       data: item
     }),
   manualPackOrderItem: (orderId, itemIndex, scannedBy = "packing-staff") =>

@@ -12,7 +12,8 @@ export default function OrderCard({ order, onDeleted, onToast }) {
     totalQuantity: order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
     packedQuantity: order.items?.reduce((sum, item) => sum + item.packedQuantity, 0) || 0
   };
-  const packed = order.packedStatus === "Packed";
+  const completed = order.packedStatus === "Completed" || order.packedStatus === "Packed";
+  const statusLabel = completed ? "Completed" : order.packedStatus;
 
   async function handleDelete() {
     const confirmed = window.confirm(`Delete order ${order.invoiceNo}?`);
@@ -39,9 +40,9 @@ export default function OrderCard({ order, onDeleted, onToast }) {
             <h3 className="text-lg font-bold">{order.invoiceNo}</h3>
             <p className="mt-1 text-sm text-black/60 dark:text-white/60">{order.customerName}</p>
           </div>
-          <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${packed ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-100"}`}>
-            {packed ? <CheckCircle2 size={14} /> : <ClipboardList size={14} />}
-            {order.packedStatus}
+          <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${completed ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-100"}`}>
+            {completed ? <CheckCircle2 size={14} /> : <ClipboardList size={14} />}
+            {statusLabel}
           </span>
         </div>
         <div className="mb-4 grid grid-cols-2 gap-3 text-sm">

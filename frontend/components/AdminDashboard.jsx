@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, TimerReset } from "lucide-react";
+import { Boxes, CheckCircle2, TimerReset } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/src/lib/api";
@@ -38,7 +38,8 @@ export default function AdminDashboard() {
   }, []);
 
   const stats = useMemo(() => {
-    const pendingOrders = orders.filter((order) => order.packedStatus !== "Packed");
+    const completedOrders = orders.filter((order) => order.packedStatus === "Completed" || order.packedStatus === "Packed");
+    const pendingOrders = orders.filter((order) => order.packedStatus !== "Completed" && order.packedStatus !== "Packed");
     const pendingProductQuantity = pendingOrders.reduce((orderSum, order) => {
       const orderPendingQuantity = (order.items || []).reduce(
         (itemSum, item) => itemSum + Math.max((item.quantity || 0) - (item.packedQuantity || 0), 0),
@@ -49,7 +50,9 @@ export default function AdminDashboard() {
 
     return {
       pendingOrders,
+      completedOrders,
       pendingOrderCount: pendingOrders.length,
+      completedOrderCount: completedOrders.length,
       pendingProductQuantity
     };
   }, [orders]);
@@ -68,6 +71,13 @@ export default function AdminDashboard() {
       value: stats.pendingProductQuantity,
       icon: Boxes,
       color: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-100"
+    },
+    {
+      href: "#completed-orders",
+      label: "Completed Orders",
+      value: stats.completedOrderCount,
+      icon: CheckCircle2,
+      color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100"
     }
   ];
 
@@ -79,7 +89,7 @@ export default function AdminDashboard() {
           <StoreBrand />
         </header>
 
-        <div className="mb-5 grid grid-cols-2 gap-3">
+        <div className="mb-5 grid gap-3 sm:grid-cols-3">
           {cards.map((card) => {
             const Icon = card.icon;
             const content = (
@@ -133,6 +143,23 @@ export default function AdminDashboard() {
             )}
           </section>
         </div>
+        <section id="completed-orders" className="mt-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-bold">Completed Orders</h2>
+          </div>
+          {loading ? null : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {stats.completedOrders.map((order) => (
+                <OrderCard key={order._id} order={order} onDeleted={removeOrder} onToast={setToast} />
+              ))}
+              {!stats.completedOrders.length && (
+                <div className="rounded-lg bg-white p-6 text-center text-sm text-black/55 dark:bg-[#151f1a] dark:text-white/55">
+                  No completed orders.
+                </div>
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </main>
   );

@@ -33,9 +33,11 @@ export default function BarcodeScanner({ active, onScan, onError }) {
           },
           (decodedText) => {
             const now = Date.now();
-            if (lastScanRef.current.value === decodedText && now - lastScanRef.current.at < 1400) return;
+            if (lastScanRef.current.value === decodedText && now - lastScanRef.current.at < 250) return;
             lastScanRef.current = { value: decodedText, at: now };
-            onScan(decodedText);
+            Promise.resolve(onScan(decodedText)).catch((error) => {
+              onError?.(error.message || "Scan failed");
+            });
           }
         );
         if (!disposed) setReady(true);

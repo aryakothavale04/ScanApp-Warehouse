@@ -21,11 +21,11 @@ function createDraft(item) {
   };
 }
 
-export default function PackingChecklist({ items, lastPackedItemId, onManualPack, onRemovePacked, onUpdateItem, onError }) {
+export default function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onRemovePacked, onUpdateItem, onError }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
-  const missing = items.filter((item) => item.packedQuantity < item.quantity);
+  const missing = items.filter((item) => (item?.packedQuantity || 0) < (item?.quantity || 0));
 
   function startEditing(index, item) {
     setEditingIndex(index);
@@ -85,8 +85,8 @@ export default function PackingChecklist({ items, lastPackedItemId, onManualPack
       </div>
 
       <div className="grid gap-3">
-        {items.map((item, index) => {
-          const done = item.packedQuantity >= item.quantity;
+        {items.map((item = {}, index) => {
+          const done = (item.packedQuantity || 0) >= (item.quantity || 0);
           const activeKey = item.productId?._id || item.productId || item.hsnOrBarcode;
           const active = lastPackedItemId && String(lastPackedItemId) === String(activeKey);
           const barcodeLabel = getBarcodeLabel(item);
@@ -234,7 +234,7 @@ export default function PackingChecklist({ items, lastPackedItemId, onManualPack
                 <div className="h-2.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${done ? "bg-emerald-600" : "bg-saffron"}`}
-                    style={{ width: `${Math.min(100, (item.packedQuantity / item.quantity) * 100)}%` }}
+                    style={{ width: `${Math.min(100, ((item.packedQuantity || 0) / (item.quantity || 1)) * 100)}%` }}
                   />
                 </div>
               </div>

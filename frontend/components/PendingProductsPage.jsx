@@ -37,7 +37,7 @@ export default function PendingProductsPage() {
     const groups = new Map();
 
     orders
-      .filter((order) => order.packedStatus !== "Packed")
+      .filter((order) => order.packedStatus !== "Completed" && order.packedStatus !== "Packed")
       .forEach((order) => {
         (order.items || []).forEach((item) => {
           const pendingQuantity = Math.max((item.quantity || 0) - (item.packedQuantity || 0), 0);

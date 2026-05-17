@@ -44,7 +44,7 @@ export default function PendingDetailsPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const pendingOrders = orders.filter((order) => order.packedStatus !== "Packed");
+    const pendingOrders = orders.filter((order) => order.packedStatus !== "Completed" && order.packedStatus !== "Packed");
 
     return {
       pendingOrders
