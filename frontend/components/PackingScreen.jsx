@@ -208,6 +208,61 @@ export default function PackingScreen({ orderId }) {
   }
 
   const packed = order.packedStatus === "Completed" || order.packedStatus === "Packed";
+  const scannerButton = (
+    <button
+      onClick={() => {
+        if (!scannerActive) armScanAudio();
+        setScannerActive((value) => !value);
+      }}
+      className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-bold text-white ${scannerActive ? "bg-red-600" : "bg-leaf"}`}
+    >
+      {scannerActive ? <Square size={18} /> : <Play size={18} />}
+      {scannerActive ? "Stop Scanner" : "Start Scanner"}
+    </button>
+  );
+  const partyButton = (
+    <button
+      type="button"
+      onClick={() => setPartyNameOpen(true)}
+      className="flex min-h-11 w-full items-center gap-3 rounded-lg bg-white px-4 py-3 text-left shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a]"
+    >
+      <UserRound size={18} className="shrink-0 text-leaf" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-semibold text-black/50 dark:text-white/50">Party Name</span>
+        <span className="block truncate text-sm font-black">{order.customerName}</span>
+      </span>
+    </button>
+  );
+  const addItemButton = (
+    <button
+      type="button"
+      onClick={() => setAddItemOpen(true)}
+      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-leaf/30 bg-white px-4 py-2 text-sm font-bold text-leaf shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a]"
+    >
+      <Plus size={17} />
+      Add Item
+    </button>
+  );
+  const scanner = scannerActive ? (
+    <BarcodeScanner
+      active={scannerActive}
+      onScan={handleScan}
+      onError={(message) => {
+        setToast({ type: "error", message });
+        playScanSound("wrong");
+      }}
+    />
+  ) : null;
+  const checklist = (
+    <PackingChecklist
+      items={order.items}
+      lastPackedItemId={lastPackedItemId}
+      onManualPack={handleManualPackItem}
+      onRemovePacked={handleRemovePackedItem}
+      onUpdateItem={handleUpdateItem}
+      onError={(message) => setToast({ type: "error", message })}
+    />
+  );
 
   return (
     <main className="min-h-screen safe-bottom">
@@ -235,61 +290,37 @@ export default function PackingScreen({ orderId }) {
           </section>
         )}
 
-        <div className="grid gap-5 lg:grid-cols-[420px_1fr]">
+        {scannerActive ? (
           <div className="space-y-4">
-            <section className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
-              <ProgressRing packed={progress.packedQuantity} total={progress.totalQuantity} />
-              <button
-                onClick={() => {
-                  if (!scannerActive) armScanAudio();
-                  setScannerActive((value) => !value);
-                }}
-                className={`mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-bold text-white ${scannerActive ? "bg-red-600" : "bg-leaf"}`}
-              >
-                {scannerActive ? <Square size={18} /> : <Play size={18} />}
-                {scannerActive ? "Stop Scanner" : "Start Scanner"}
-              </button>
+            <div className="space-y-3">
+              {scanner}
+              {scannerButton}
+            </div>
+            {checklist}
+            <section className="grid gap-3 rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a] sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <ProgressRing packed={progress.packedQuantity} total={progress.totalQuantity} />
+              </div>
+              {partyButton}
+              {addItemButton}
             </section>
-            <button
-              type="button"
-              onClick={() => setPartyNameOpen(true)}
-              className="flex min-h-11 w-full items-center gap-3 rounded-lg bg-white px-4 py-3 text-left shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a]"
-            >
-              <UserRound size={18} className="shrink-0 text-leaf" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-xs font-semibold text-black/50 dark:text-white/50">Party Name</span>
-                <span className="block truncate text-sm font-black">{order.customerName}</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setAddItemOpen(true)}
-              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-leaf/30 bg-white px-4 py-2 text-sm font-bold text-leaf shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a]"
-            >
-              <Plus size={17} />
-              Add Item
-            </button>
-            {scannerActive && (
-              <BarcodeScanner
-                active={scannerActive}
-                onScan={handleScan}
-                onError={(message) => {
-                  setToast({ type: "error", message });
-                  playScanSound("wrong");
-                }}
-              />
-            )}
           </div>
+        ) : (
+          <div className="grid gap-5 lg:grid-cols-[420px_1fr]">
+            <div className="space-y-4">
+              <section className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
+                <ProgressRing packed={progress.packedQuantity} total={progress.totalQuantity} />
+                <div className="mt-4">
+                  {scannerButton}
+                </div>
+              </section>
+              {partyButton}
+              {addItemButton}
+            </div>
 
-          <PackingChecklist
-            items={order.items}
-            lastPackedItemId={lastPackedItemId}
-            onManualPack={handleManualPackItem}
-            onRemovePacked={handleRemovePackedItem}
-            onUpdateItem={handleUpdateItem}
-            onError={(message) => setToast({ type: "error", message })}
-          />
-        </div>
+            {checklist}
+          </div>
+        )}
       </div>
       {addItemOpen && (
         <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-3 sm:place-items-center">
