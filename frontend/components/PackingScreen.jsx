@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Loader2, Play, Plus, Save, Square, UserRound } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Play, Plus, Save, Square, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/src/lib/api";
 import BarcodeScanner from "./BarcodeScanner";
@@ -66,9 +66,10 @@ export default function PackingScreen({ orderId }) {
   const [lastPackedItemId, setLastPackedItemId] = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [partyName, setPartyName] = useState("");
-  const [itemDraft, setItemDraft] = useState({ productName: "", quantity: 1, barcode: "" });
+  const [itemDraft, setItemDraft] = useState({ productName: "", hsnOrBarcode: "", quantity: 1, pricePerUnit: "" });
   const [savingParty, setSavingParty] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
+  const [addItemOpen, setAddItemOpen] = useState(false);
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
@@ -159,7 +160,8 @@ export default function PackingScreen({ orderId }) {
       const data = await api.addOrderItem(orderId, itemDraft);
       setOrder(data.order);
       setPartyName(data.order?.customerName || "");
-      setItemDraft({ productName: "", quantity: 1, barcode: "" });
+      setItemDraft({ productName: "", hsnOrBarcode: "", quantity: 1, pricePerUnit: "" });
+      setAddItemOpen(false);
       setToast({ type: "success", message: data.message || "Item added" });
     } catch (error) {
       setToast({ type: "error", message: error.message });
@@ -251,47 +253,14 @@ export default function PackingScreen({ orderId }) {
                 </button>
               </div>
             </section>
-            <section className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
-              <div className="mb-3 flex items-center gap-2">
-                <Plus size={18} />
-                <h2 className="font-bold">Add Item</h2>
-              </div>
-              <form onSubmit={handleAddItem} className="grid gap-2">
-                <input
-                  value={itemDraft.productName}
-                  onChange={(event) => setItemDraft((current) => ({ ...current, productName: event.target.value }))}
-                  className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
-                  placeholder="Product name"
-                  aria-label="Product name"
-                />
-                <div className="grid grid-cols-[110px_1fr] gap-2">
-                  <input
-                    type="number"
-                    min="0.001"
-                    step="0.001"
-                    value={itemDraft.quantity}
-                    onChange={(event) => setItemDraft((current) => ({ ...current, quantity: event.target.value }))}
-                    className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
-                    aria-label="Quantity"
-                  />
-                  <input
-                    value={itemDraft.barcode}
-                    onChange={(event) => setItemDraft((current) => ({ ...current, barcode: event.target.value }))}
-                    className="rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
-                    placeholder="Barcode optional"
-                    aria-label="Barcode optional"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={addingItem}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
-                >
-                  {addingItem ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-                  Add Item
-                </button>
-              </form>
-            </section>
+            <button
+              type="button"
+              onClick={() => setAddItemOpen(true)}
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-leaf/30 bg-white px-4 py-2 text-sm font-bold text-leaf shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a]"
+            >
+              <Plus size={17} />
+              Add Item
+            </button>
             {scannerActive && (
               <BarcodeScanner
                 active={scannerActive}
@@ -314,6 +283,91 @@ export default function PackingScreen({ orderId }) {
           />
         </div>
       </div>
+      {addItemOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-3 sm:place-items-center">
+          <form onSubmit={handleAddItem} className="w-full max-w-md rounded-lg bg-white p-4 shadow-soft dark:bg-[#151f1a]">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black">Add Item</h2>
+                <p className="text-xs text-black/55 dark:text-white/55">This item will appear in the checklist immediately.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddItemOpen(false)}
+                className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#101712]"
+                aria-label="Close add item"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid gap-3">
+              <label className="grid gap-1.5 text-sm font-bold">
+                Item name
+                <input
+                  value={itemDraft.productName}
+                  onChange={(event) => setItemDraft((current) => ({ ...current, productName: event.target.value }))}
+                  className="rounded-lg border border-black/10 bg-white px-3 py-3 font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                  placeholder="Enter item name"
+                  autoFocus
+                />
+              </label>
+              <label className="grid gap-1.5 text-sm font-bold">
+                Item code
+                <input
+                  value={itemDraft.hsnOrBarcode}
+                  onChange={(event) => setItemDraft((current) => ({ ...current, hsnOrBarcode: event.target.value }))}
+                  className="rounded-lg border border-black/10 bg-white px-3 py-3 font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                  placeholder="Barcode / item code optional"
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="grid gap-1.5 text-sm font-bold">
+                  Qty
+                  <input
+                    type="number"
+                    min="0.001"
+                    step="0.001"
+                    value={itemDraft.quantity}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, quantity: event.target.value }))}
+                    className="rounded-lg border border-black/10 bg-white px-3 py-3 font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-bold">
+                  Price/unit
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={itemDraft.pricePerUnit}
+                    onChange={(event) => setItemDraft((current) => ({ ...current, pricePerUnit: event.target.value }))}
+                    className="rounded-lg border border-black/10 bg-white px-3 py-3 font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                    placeholder="0"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setAddItemOpen(false)}
+                className="min-h-11 rounded-lg border border-black/10 px-4 py-2 text-sm font-bold dark:border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={addingItem}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {addingItem ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+                Add
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </main>
   );
 }

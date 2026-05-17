@@ -121,8 +121,9 @@ export async function addOrderItem(req, res) {
     return res.status(404).json({ message: "Order not found" });
   }
 
-  const { productName, hsnOrBarcode, barcode, quantity } = req.body;
+  const { productName, hsnOrBarcode, barcode, quantity, pricePerUnit } = req.body;
   const nextQuantity = Number(quantity);
+  const nextPricePerUnit = Number(pricePerUnit);
   if (!productName?.trim()) {
     return res.status(400).json({ message: "Product name is required" });
   }
@@ -134,8 +135,8 @@ export async function addOrderItem(req, res) {
     productName: productName.trim(),
     hsnOrBarcode: (hsnOrBarcode || barcode || "").toString().trim(),
     quantity: nextQuantity,
-    pricePerUnit: 0,
-    totalAmount: 0,
+    pricePerUnit: Number.isFinite(nextPricePerUnit) && nextPricePerUnit > 0 ? nextPricePerUnit : 0,
+    totalAmount: Number.isFinite(nextPricePerUnit) && nextPricePerUnit > 0 ? Number((nextQuantity * nextPricePerUnit).toFixed(2)) : 0,
     packedQuantity: 0,
     invoiceLine: "Manually added"
   });
