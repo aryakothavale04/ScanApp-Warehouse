@@ -5,8 +5,15 @@ import { useEffect, useRef, useState } from "react";
 
 export default function BarcodeScanner({ active, onScan, onError }) {
   const scannerRef = useRef(null);
+  const onScanRef = useRef(onScan);
+  const onErrorRef = useRef(onError);
   const lastScanRef = useRef({ value: "", at: 0 });
   const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    onScanRef.current = onScan;
+    onErrorRef.current = onError;
+  }, [onError, onScan]);
 
   useEffect(() => {
     let disposed = false;
@@ -33,16 +40,16 @@ export default function BarcodeScanner({ active, onScan, onError }) {
           },
           (decodedText) => {
             const now = Date.now();
-            if (lastScanRef.current.value === decodedText && now - lastScanRef.current.at < 250) return;
+            if (lastScanRef.current.value === decodedText && now - lastScanRef.current.at < 1000) return;
             lastScanRef.current = { value: decodedText, at: now };
-            Promise.resolve(onScan(decodedText)).catch((error) => {
-              onError?.(error.message || "Scan failed");
+            Promise.resolve(onScanRef.current(decodedText)).catch((error) => {
+              onErrorRef.current?.(error.message || "Scan failed");
             });
           }
         );
         if (!disposed) setReady(true);
       } catch (error) {
-        onError?.(error.message || "Camera scanner could not start");
+        onErrorRef.current?.(error.message || "Camera scanner could not start");
       }
     }
 
@@ -66,7 +73,7 @@ export default function BarcodeScanner({ active, onScan, onError }) {
       disposed = true;
       stopScanner();
     };
-  }, [active, onError, onScan]);
+  }, [active]);
 
   return (
     <section className="overflow-hidden rounded-lg bg-ink text-white shadow-soft dark:bg-black">

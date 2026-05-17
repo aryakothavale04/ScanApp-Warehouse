@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Loader2, Play, Plus, Save, Square, UserRound, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/src/lib/api";
 import BarcodeScanner from "./BarcodeScanner";
 import PackingChecklist from "./PackingChecklist";
@@ -71,6 +71,8 @@ export default function PackingScreen({ orderId }) {
   const [addingItem, setAddingItem] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [partyNameOpen, setPartyNameOpen] = useState(false);
+  const scanLoadingRef = useRef(false);
+  const lastWrongScanRef = useRef({ value: "", at: 0 });
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
@@ -95,7 +97,8 @@ export default function PackingScreen({ orderId }) {
   }, [order]);
 
   const handleScan = useCallback(async (barcode) => {
-    if (scanLoading) return;
+    if (scanLoadingRef.current) return;
+    scanLoadingRef.current = true;
     setScanLoading(true);
     try {
       const data = await api.scan(orderId, barcode);
@@ -107,13 +110,21 @@ export default function PackingScreen({ orderId }) {
       window.navigator.vibrate?.(70);
       setTimeout(() => setLastPackedItemId(null), 900);
     } catch (error) {
+      const now = Date.now();
+      const scannedValue = barcode?.toString() || "";
+      const isRepeatWrongScan = lastWrongScanRef.current.value === scannedValue && now - lastWrongScanRef.current.at < 2500;
+      lastWrongScanRef.current = { value: scannedValue, at: now };
+
       setToast({ type: "error", message: error.message });
-      playScanSound("wrong");
-      window.navigator.vibrate?.([80, 40, 80]);
+      if (!isRepeatWrongScan) {
+        playScanSound("wrong");
+        window.navigator.vibrate?.([80, 40, 80]);
+      }
     } finally {
+      scanLoadingRef.current = false;
       setScanLoading(false);
     }
-  }, [orderId, scanLoading]);
+  }, [orderId]);
 
   const handleUpdateItem = useCallback(async (itemIndex, item) => {
     const data = await api.updateOrderItem(orderId, itemIndex, item);
