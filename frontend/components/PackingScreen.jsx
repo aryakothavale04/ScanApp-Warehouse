@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Loader2, Play, Plus, Save, Square, UserRound, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, PackageCheck, Play, Plus, Save, Square, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/src/lib/api";
 import BarcodeScanner from "./BarcodeScanner";
@@ -76,6 +76,7 @@ export default function PackingScreen({ orderId }) {
   const [itemDraft, setItemDraft] = useState({ productName: "", hsnOrBarcode: "", quantity: 1, pricePerUnit: "" });
   const [savingParty, setSavingParty] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
+  const [completingOrder, setCompletingOrder] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [partyNameOpen, setPartyNameOpen] = useState(false);
   const scanLoadingRef = useRef(false);
@@ -157,6 +158,22 @@ export default function PackingScreen({ orderId }) {
     setOrder(data.order);
     setPartyName(data.order?.customerName || "");
     setToast({ type: "success", message: data.message || "Packed item removed" });
+  }, [orderId]);
+
+  const handleManualCompleteOrder = useCallback(async () => {
+    setCompletingOrder(true);
+    try {
+      const data = await api.manuallyCompleteOrder(orderId);
+      setOrder(data.order);
+      setPartyName(data.order?.customerName || "");
+      setToast({ type: "success", message: data.message || "Order completed" });
+      playScanSound("complete");
+      window.navigator.vibrate?.([70, 40, 70]);
+    } catch (error) {
+      setToast({ type: "error", message: error.message });
+    } finally {
+      setCompletingOrder(false);
+    }
   }, [orderId]);
 
   const handleSavePartyName = useCallback(async () => {
@@ -279,6 +296,15 @@ export default function PackingScreen({ orderId }) {
               <p className="min-w-0 flex-1 truncate text-xs font-bold text-black/70 dark:text-white/70">
                 {order.customerName} - Invoice {order.invoiceNo}
               </p>
+              <button
+                type="button"
+                onClick={handleManualCompleteOrder}
+                disabled={completingOrder || packed}
+                className="flex min-h-9 shrink-0 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-55"
+              >
+                {completingOrder ? <Loader2 className="animate-spin" size={14} /> : <PackageCheck size={14} />}
+                Complete
+              </button>
               <button
                 onClick={() => setScannerActive(false)}
                 className="flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white"

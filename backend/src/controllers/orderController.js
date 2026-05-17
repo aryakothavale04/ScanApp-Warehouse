@@ -234,6 +234,40 @@ export async function manuallyPackOrderItem(req, res) {
   });
 }
 
+export async function manuallyCompleteOrder(req, res) {
+  const order = await Order.findById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const changedItems = order.items.filter((item) => (item.packedQuantity || 0) < (item.quantity || 0));
+  if (!changedItems.length) {
+    const populated = await populateOrder(Order.findById(order._id));
+    return res.json({ message: "Order already completed", order: populated });
+  }
+
+  changedItems.forEach((item) => {
+    item.packedQuantity = item.quantity;
+  });
+
+  order.recalculateStatus();
+  await order.save();
+
+  await PackingLog.insertMany(changedItems.map((item) => ({
+    orderId: order._id,
+    productId: item.productId,
+    scannedAt: new Date(),
+    scannedBy: req.body.scannedBy || "packing-staff",
+    barcode: normalizeBarcode(item.hsnOrBarcode || item.productId?.barcode) || "manual-order-complete"
+  })));
+
+  const populated = await populateOrder(Order.findById(order._id));
+  res.json({
+    message: "Order manually completed",
+    order: populated
+  });
+}
+
 export async function removePackedOrderItem(req, res) {
   const order = await Order.findById(req.params.id);
   if (!order) {

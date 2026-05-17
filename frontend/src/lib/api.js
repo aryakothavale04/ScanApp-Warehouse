@@ -56,6 +56,10 @@ export const api = {
     request(`/api/orders/${orderId}/scan`, "post", {
       data: { barcode, scannedBy }
     }),
+  manuallyCompleteOrder: (orderId, scannedBy = "packing-staff") =>
+    request(`/api/orders/${orderId}/manual-complete`, "post", {
+      data: { scannedBy }
+    }),
   updateOrderItem: (orderId, itemIndex, item) =>
     request(`/api/orders/${orderId}/items/${itemIndex}`, "patch", {
       data: item

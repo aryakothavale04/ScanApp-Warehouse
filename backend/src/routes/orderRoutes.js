@@ -4,6 +4,7 @@ import {
   deleteOrder,
   getOrder,
   listOrders,
+  manuallyCompleteOrder,
   manuallyPackOrderItem,
   removePackedOrderItem,
   scanBarcode,
@@ -22,6 +23,7 @@ router.get("/:id", asyncHandler(getOrder));
 router.patch("/:id", asyncHandler(updateOrder));
 router.delete("/:id", asyncHandler(deleteOrder));
 router.post("/:id/scan", asyncHandler(scanBarcode));
+router.post("/:id/manual-complete", asyncHandler(manuallyCompleteOrder));
 router.post("/:id/items", asyncHandler(addOrderItem));
 router.patch("/:id/items/:itemIndex", asyncHandler(updateOrderItem));
 router.post("/:id/items/:itemIndex/manual-pack", asyncHandler(manuallyPackOrderItem));
