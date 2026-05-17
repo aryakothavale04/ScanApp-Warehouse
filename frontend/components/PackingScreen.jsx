@@ -70,6 +70,7 @@ export default function PackingScreen({ orderId }) {
   const [savingParty, setSavingParty] = useState(false);
   const [addingItem, setAddingItem] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
+  const [partyNameOpen, setPartyNameOpen] = useState(false);
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
@@ -145,6 +146,7 @@ export default function PackingScreen({ orderId }) {
       const data = await api.updateOrder(orderId, { customerName: partyName });
       setOrder(data.order);
       setPartyName(data.order?.customerName || "");
+      setPartyNameOpen(false);
       setToast({ type: "success", message: data.message || "Party name updated" });
     } catch (error) {
       setToast({ type: "error", message: error.message });
@@ -229,30 +231,17 @@ export default function PackingScreen({ orderId }) {
                 {scannerActive ? "Stop Scanner" : "Start Scanner"}
               </button>
             </section>
-            <section className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
-              <div className="mb-3 flex items-center gap-2">
-                <UserRound size={18} />
-                <h2 className="font-bold">Party Name</h2>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={partyName}
-                  onChange={(event) => setPartyName(event.target.value)}
-                  className="min-w-0 flex-1 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
-                  aria-label="Party name"
-                />
-                <button
-                  type="button"
-                  onClick={handleSavePartyName}
-                  disabled={savingParty}
-                  className="grid h-10 w-10 place-items-center rounded-lg bg-leaf text-white disabled:opacity-60"
-                  aria-label="Save party name"
-                  title="Save party name"
-                >
-                  {savingParty ? <Loader2 className="animate-spin" size={17} /> : <Save size={17} />}
-                </button>
-              </div>
-            </section>
+            <button
+              type="button"
+              onClick={() => setPartyNameOpen(true)}
+              className="flex min-h-11 w-full items-center gap-3 rounded-lg bg-white px-4 py-3 text-left shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a]"
+            >
+              <UserRound size={18} className="shrink-0 text-leaf" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold text-black/50 dark:text-white/50">Party Name</span>
+                <span className="block truncate text-sm font-black">{order.customerName}</span>
+              </span>
+            </button>
             <button
               type="button"
               onClick={() => setAddItemOpen(true)}
@@ -363,6 +352,62 @@ export default function PackingScreen({ orderId }) {
               >
                 {addingItem ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
                 Add
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      {partyNameOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-3 sm:place-items-center">
+          <form onSubmit={(event) => { event.preventDefault(); handleSavePartyName(); }} className="w-full max-w-md rounded-lg bg-white p-4 shadow-soft dark:bg-[#151f1a]">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-black">Change Party Name</h2>
+                <p className="text-xs text-black/55 dark:text-white/55">This change will be saved to the order immediately.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPartyName(order.customerName || "");
+                  setPartyNameOpen(false);
+                }}
+                className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#101712]"
+                aria-label="Close party name editor"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <label className="grid gap-1.5 text-sm font-bold">
+              Party name
+              <input
+                value={partyName}
+                onChange={(event) => setPartyName(event.target.value)}
+                className="rounded-lg border border-black/10 bg-white px-3 py-3 font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                placeholder="Enter party name"
+                autoFocus
+              />
+            </label>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setPartyName(order.customerName || "");
+                  setPartyNameOpen(false);
+                }}
+                disabled={savingParty}
+                className="min-h-11 rounded-lg border border-black/10 px-4 py-2 text-sm font-bold dark:border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingParty}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {savingParty ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                Save
               </button>
             </div>
           </form>

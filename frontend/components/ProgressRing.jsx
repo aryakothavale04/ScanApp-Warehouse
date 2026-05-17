@@ -4,7 +4,7 @@ export default function ProgressRing({ packed = 0, total = 0 }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between text-sm font-semibold">
-        <span>पॅकिंग प्रगती</span>
+        <span>Packing Progress</span>
         <span>{packed}/{total}</span>
       </div>
       <div className="h-3 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
