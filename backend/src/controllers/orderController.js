@@ -215,7 +215,12 @@ export async function manuallyPackOrderItem(req, res) {
     return res.status(404).json({ message: "Order item not found" });
   }
 
-  item.packedQuantity = item.quantity;
+  if (item.packedQuantity >= item.quantity) {
+    return res.status(409).json({ message: `Qty completed: ${item.productName} is already fully packed` });
+  }
+
+  const remainingQuantity = item.quantity - item.packedQuantity;
+  item.packedQuantity += Math.min(1, remainingQuantity);
   order.recalculateStatus();
   await order.save();
 
@@ -228,8 +233,9 @@ export async function manuallyPackOrderItem(req, res) {
   });
 
   const populated = await populateOrder(Order.findById(order._id));
+  const itemCompleted = item.packedQuantity >= item.quantity;
   res.json({
-    message: `${item.productName} manually packed`,
+    message: populated.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed" : `${item.productName} manually packed`,
     packedItem: { productId: item.productId, hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
     order: populated
   });

@@ -162,8 +162,8 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                       onClick={() => manualPack(index)}
                       disabled={busyAction === `pack-${index}`}
                       className="grid h-8 w-8 place-items-center rounded-full bg-emerald-600 text-white shadow-sm disabled:opacity-60"
-                      aria-label={`Mark ${item.productName || "product"} packed manually`}
-                      title="Mark packed manually"
+                      aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
+                      title="Add 1 manually"
                     >
                       <PackageCheck size={15} />
                     </button>
