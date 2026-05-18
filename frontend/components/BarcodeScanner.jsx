@@ -39,30 +39,21 @@ export default function BarcodeScanner({ active, onScan, onError, compact = fals
         const formatsToSupport = FAST_SCAN_FORMATS
           .map((format) => Html5QrcodeSupportedFormats?.[format])
           .filter((format) => format !== undefined);
-        const scanner = new Html5Qrcode("barcode-reader", {
-          verbose: false,
-          formatsToSupport
-        });
+        const scannerOptions = { verbose: false };
+        if (formatsToSupport.length) {
+          scannerOptions.formatsToSupport = formatsToSupport;
+        }
+        const scanner = new Html5Qrcode("barcode-reader", scannerOptions);
         scannerRef.current = scanner;
         const scannerConfig = {
-          fps: 24,
+          fps: 18,
           disableFlip: true,
-          rememberLastUsedCamera: true,
           qrbox: (viewfinderWidth, viewfinderHeight) => {
             const width = Math.floor(Math.min(viewfinderWidth * 0.9, compact ? 260 : 430));
             const height = Math.floor(Math.min(viewfinderHeight * 0.28, compact ? 96 : 150));
             return { width, height };
           },
           aspectRatio: 1.777
-        };
-        const fallbackScannerConfig = {
-          fps: 15,
-          disableFlip: true,
-          qrbox: (viewfinderWidth, viewfinderHeight) => {
-            const width = Math.floor(Math.min(viewfinderWidth * 0.86, compact ? 250 : 380));
-            const height = Math.floor(Math.min(viewfinderHeight * 0.32, compact ? 110 : 170));
-            return { width, height };
-          }
         };
         const onDecoded = (decodedText) => {
           const now = Date.now();
@@ -75,36 +66,12 @@ export default function BarcodeScanner({ active, onScan, onError, compact = fals
 
         const onDecodeError = () => {};
 
-        try {
-          await scanner.start(
-            {
-              facingMode: "environment",
-              advanced: [
-                { focusMode: "continuous" },
-                { exposureMode: "continuous" }
-              ]
-            },
-            scannerConfig,
-            onDecoded,
-            onDecodeError
-          );
-        } catch {
-          try {
-            await scanner.start(
-              { facingMode: "environment" },
-              scannerConfig,
-              onDecoded,
-              onDecodeError
-            );
-          } catch {
-            await scanner.start(
-              { facingMode: "environment" },
-              fallbackScannerConfig,
-              onDecoded,
-              onDecodeError
-            );
-          }
-        }
+        await scanner.start(
+          { facingMode: "environment" },
+          scannerConfig,
+          onDecoded,
+          onDecodeError
+        );
         if (!disposed) setReady(true);
       } catch (error) {
         onErrorRef.current?.(error.message || "Camera scanner could not start");
