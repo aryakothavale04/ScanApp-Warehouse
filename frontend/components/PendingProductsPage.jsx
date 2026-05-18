@@ -311,7 +311,7 @@ export default function PendingProductsPage() {
     <main className="min-h-screen safe-bottom">
       <Toast toast={toast} onClose={() => setToast(null)} />
       <div className="mx-auto max-w-4xl px-3 py-3 sm:px-5 lg:px-6">
-        <header className="sticky top-0 z-20 -mx-3 mb-3 grid gap-2 border-b border-black/5 bg-limewash/95 px-3 py-2 backdrop-blur dark:border-white/5 dark:bg-[#101714]/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+        <header className="-mx-3 mb-3 grid gap-2 border-b border-black/5 bg-limewash/95 px-3 py-2 backdrop-blur dark:border-white/5 dark:bg-[#101714]/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
           <div className="min-w-0">
             <StoreBrand />
             <h1 className="mt-0.5 truncate text-sm font-black sm:mt-1 sm:text-lg">Pending Product Details</h1>
