@@ -97,17 +97,17 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
   }
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-2.5 sm:space-y-4">
       {!scanningMode && (
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">Product Checklist</h2>
-        <span className="rounded-full bg-black/5 px-3 py-1 text-xs font-semibold dark:bg-white/10">
+        <h2 className="text-base font-bold sm:text-lg">Product Checklist</h2>
+        <span className="rounded-full bg-black/5 px-2.5 py-0.5 text-[11px] font-semibold dark:bg-white/10 sm:px-3 sm:py-1 sm:text-xs">
           Missing {missing.length}
         </span>
       </div>
       )}
 
-      <div className={scanningMode ? "grid gap-2" : "grid gap-3"}>
+      <div className={scanningMode ? "grid gap-1.5 sm:gap-2" : "grid gap-2 sm:gap-3"}>
         {visibleItems.map(({ item = {}, index }) => {
           const done = (item.packedQuantity || 0) >= (item.quantity || 0);
           const activeKey = item.productId?._id || item.productId || item.hsnOrBarcode;
@@ -119,53 +119,53 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
           return (
             <article
               key={`${item.productId?._id || item.productName}-${item.productName}-${index}`}
-              className={`rounded-lg border shadow-sm transition ${scanningMode ? "p-3" : "p-4"} ${done ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/45" : "border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a]"} ${active ? "scan-success ring-2 ring-leaf" : ""}`}
+              className={`rounded-lg border shadow-sm transition ${scanningMode ? "p-2 sm:p-3" : "p-2.5 sm:p-4"} ${done ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950/45" : "border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a]"} ${active ? "scan-success ring-2 ring-leaf" : ""}`}
             >
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start justify-between gap-2 sm:gap-3">
                 <div className="min-w-0 flex-1">
                   {isEditing ? (
-                    <div className="grid gap-2">
+                    <div className="grid gap-1.5 sm:gap-2">
                       <input
                         value={draft.productName}
                         onChange={(event) => updateDraft("productName", event.target.value)}
-                        className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 font-semibold outline-none focus:border-leaf"
+                        className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm font-semibold outline-none focus:border-leaf sm:px-3"
                         aria-label="Product name"
                       />
                       <input
                         value={draft.hsnOrBarcode}
                         onChange={(event) => updateDraft("hsnOrBarcode", event.target.value)}
-                        className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-leaf"
+                        className="w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm outline-none focus:border-leaf sm:px-3"
                         placeholder="Barcode or Missing"
                         aria-label="HSN or barcode"
                       />
                     </div>
                   ) : (
                     <>
-                      <h3 className={`flex items-start gap-2 font-bold leading-tight ${scanningMode ? "text-sm" : ""}`}>
+                      <h3 className={`flex items-start gap-1.5 font-bold leading-tight sm:gap-2 ${scanningMode ? "text-xs sm:text-sm" : "text-sm sm:text-base"}`}>
                         {item.serialNo ? (
                           <span className="shrink-0 text-black/45 dark:text-white/45">{item.serialNo}.</span>
                         ) : null}
                         <span className="min-w-0">{item.productName}</span>
                       </h3>
-                      <p className={`mt-1 text-black/55 dark:text-white/55 ${scanningMode ? "text-xs" : "text-sm"}`}>
+                      <p className={`mt-0.5 text-black/55 dark:text-white/55 sm:mt-1 ${scanningMode ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"}`}>
                         HSN / Barcode: {barcodeLabel}
                       </p>
                     </>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                   {!scanningMode && (
                     <button
                       onClick={() => (isEditing ? cancelEditing() : startEditing(index, item))}
-                      className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white text-black/70"
+                      className="grid h-8 w-8 place-items-center rounded-lg border border-black/10 bg-white text-black/70 sm:h-10 sm:w-10"
                       aria-label={isEditing ? "Cancel edit" : "Edit item"}
                       title={isEditing ? "Cancel edit" : "Edit item"}
                     >
                       {isEditing ? <X size={18} /> : <Edit3 size={18} />}
                     </button>
                   )}
-                  <div className={`grid place-items-center rounded-full ${scanningMode ? "h-8 w-8" : "h-10 w-10"} ${done ? "bg-emerald-600 text-white" : "bg-black/5 text-black/40 dark:bg-white/10 dark:text-white/50"}`}>
-                    {done ? <Check size={scanningMode ? 18 : 22} /> : <PackageX size={scanningMode ? 17 : 20} />}
+                  <div className={`grid place-items-center rounded-full ${scanningMode ? "h-7 w-7 sm:h-8 sm:w-8" : "h-8 w-8 sm:h-10 sm:w-10"} ${done ? "bg-emerald-600 text-white" : "bg-black/5 text-black/40 dark:bg-white/10 dark:text-white/50"}`}>
+                    {done ? <Check size={scanningMode ? 16 : 20} /> : <PackageX size={scanningMode ? 15 : 18} />}
                   </div>
                   {scanningMode && canManualPack && (
                     <>
@@ -173,30 +173,30 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                         type="button"
                         onClick={() => manualPack(index)}
                         disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
-                        className="grid h-8 w-8 place-items-center rounded-full bg-leaf text-white shadow-sm disabled:opacity-60"
+                        className="grid h-7 w-7 place-items-center rounded-full bg-leaf text-white shadow-sm disabled:opacity-60 sm:h-8 sm:w-8"
                         aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
                         title="Only 1 qty packed"
                       >
-                        <PackageCheck size={15} />
+                        <PackageCheck size={14} />
                       </button>
                       <button
                         type="button"
                         onClick={() => manualPackFull(index)}
                         disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
-                        className="grid h-8 w-8 place-items-center rounded-full bg-emerald-600 text-white shadow-sm disabled:opacity-60"
+                        className="grid h-7 w-7 place-items-center rounded-full bg-emerald-600 text-white shadow-sm disabled:opacity-60 sm:h-8 sm:w-8"
                         aria-label={`Mark full quantity packed for ${item.productName || "product"}`}
                         title="Full qty packed"
                       >
-                        <CheckCheck size={15} />
+                        <CheckCheck size={14} />
                       </button>
                     </>
                   )}
                 </div>
               </div>
 
-              <div className={scanningMode ? "mt-2" : "mt-4"}>
-                <div className={`${scanningMode ? "mb-2 grid-cols-3" : "mb-3 grid-cols-2 sm:grid-cols-3"} grid gap-2 text-xs`}>
-                  <div className="rounded-lg bg-black/5 p-2 dark:bg-white/10">
+              <div className={scanningMode ? "mt-1.5 sm:mt-2" : "mt-2.5 sm:mt-4"}>
+                <div className={`${scanningMode ? "mb-1.5 grid-cols-3" : "mb-2 grid-cols-3 sm:mb-3"} grid gap-1.5 text-[11px] sm:gap-2 sm:text-xs`}>
+                  <div className="rounded-lg bg-black/5 p-1.5 dark:bg-white/10 sm:p-2">
                     <p className="text-black/50 dark:text-white/50">Qty</p>
                     {isEditing ? (
                       <input
@@ -212,7 +212,7 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                       <p className="font-bold">{item.quantity}</p>
                     )}
                   </div>
-                  <div className="rounded-lg bg-black/5 p-2 dark:bg-white/10">
+                  <div className="rounded-lg bg-black/5 p-1.5 dark:bg-white/10 sm:p-2">
                     <p className="text-black/50 dark:text-white/50">Price/unit</p>
                     {isEditing ? (
                       <input
@@ -228,7 +228,7 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                       <p className="font-bold">Rs {item.pricePerUnit ?? 0}</p>
                     )}
                   </div>
-                  <div className="rounded-lg bg-black/5 p-2 dark:bg-white/10">
+                  <div className="rounded-lg bg-black/5 p-1.5 dark:bg-white/10 sm:p-2">
                     <p className="text-black/50 dark:text-white/50">Amount</p>
                     {isEditing ? (
                       <input
@@ -247,12 +247,12 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                 </div>
 
                 {!scanningMode && (isEditing || canManualPack || done) && (
-                  <div className="mb-3 flex flex-wrap gap-2">
+                  <div className="mb-2 flex flex-wrap gap-1.5 sm:mb-3 sm:gap-2">
                     {isEditing && (
                       <button
                         onClick={() => saveItem(index)}
                         disabled={busyAction === `save-${index}`}
-                        className="flex items-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                        className="flex min-h-9 items-center gap-1.5 rounded-lg bg-leaf px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                       >
                         <Save size={16} />
                         Save item
@@ -263,7 +263,7 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                         <button
                           onClick={() => manualPackFull(index)}
                           disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
-                          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                          className="flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                         >
                           <CheckCheck size={16} />
                           Full qty packed
@@ -271,7 +271,7 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                         <button
                           onClick={() => manualPack(index)}
                           disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
-                          className="flex items-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                          className="flex min-h-9 items-center gap-1.5 rounded-lg bg-leaf px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                         >
                           <PackageCheck size={16} />
                           Only 1 qty packed
@@ -282,7 +282,7 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                       <button
                         onClick={() => removePacked(index)}
                         disabled={busyAction === `remove-${index}`}
-                        className="flex items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-bold text-red-700 disabled:opacity-60"
+                        className="flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                       >
                         <RotateCcw size={16} />
                         Remove packed
@@ -291,11 +291,11 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                   </div>
                 )}
 
-                <div className={`mb-1.5 flex justify-between font-semibold ${scanningMode ? "text-xs" : "text-sm"}`}>
+                <div className={`mb-1 flex justify-between font-semibold sm:mb-1.5 ${scanningMode ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"}`}>
                   <span>Packed</span>
                   <span>{item.packedQuantity}/{item.quantity}</span>
                 </div>
-                <div className={`${scanningMode ? "h-2" : "h-2.5"} overflow-hidden rounded-full bg-black/10 dark:bg-white/10`}>
+                <div className={`${scanningMode ? "h-1.5 sm:h-2" : "h-2 sm:h-2.5"} overflow-hidden rounded-full bg-black/10 dark:bg-white/10`}>
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${done ? "bg-emerald-600" : "bg-saffron"}`}
                     style={{ width: `${Math.min(100, ((item.packedQuantity || 0) / (item.quantity || 1)) * 100)}%` }}

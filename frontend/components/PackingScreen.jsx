@@ -273,7 +273,7 @@ export default function PackingScreen({ orderId }) {
         if (!scannerActive) armScanAudio();
         setScannerActive((value) => !value);
       }}
-      className={`flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-bold text-white ${scannerActive ? "bg-red-600" : "bg-leaf"}`}
+      className={`flex min-h-10 w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-white sm:min-h-12 sm:px-4 sm:py-3 sm:text-base ${scannerActive ? "bg-red-600" : "bg-leaf"}`}
     >
       {scannerActive ? <Square size={18} /> : <Play size={18} />}
       {scannerActive ? "Stop Scanner" : "Start Scanner"}
@@ -283,12 +283,12 @@ export default function PackingScreen({ orderId }) {
     <button
       type="button"
       onClick={() => setPartyNameOpen(true)}
-      className="flex min-h-11 w-full items-center gap-3 rounded-lg bg-white px-4 py-3 text-left shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a]"
+      className="flex min-h-10 w-full items-center gap-2 rounded-lg bg-white px-3 py-2 text-left shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a] sm:min-h-11 sm:gap-3 sm:px-4 sm:py-3"
     >
       <UserRound size={18} className="shrink-0 text-leaf" />
       <span className="min-w-0 flex-1">
-        <span className="block text-xs font-semibold text-black/50 dark:text-white/50">Party Name</span>
-        <span className="block truncate text-sm font-black">{order.customerName}</span>
+        <span className="block text-[11px] font-semibold text-black/50 dark:text-white/50 sm:text-xs">Party Name</span>
+        <span className="block truncate text-xs font-black sm:text-sm">{order.customerName}</span>
       </span>
     </button>
   );
@@ -296,7 +296,7 @@ export default function PackingScreen({ orderId }) {
     <button
       type="button"
       onClick={() => setAddItemOpen(true)}
-      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-leaf/30 bg-white px-4 py-2 text-sm font-bold text-leaf shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a]"
+      className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-leaf/30 bg-white px-3 py-2 text-sm font-bold text-leaf shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a] sm:min-h-11 sm:px-4"
     >
       <Plus size={17} />
       Add Item
@@ -329,9 +329,9 @@ export default function PackingScreen({ orderId }) {
   return (
     <main className="min-h-screen safe-bottom">
       <Toast toast={toast} onClose={() => setToast(null)} />
-      <div className="mx-auto max-w-6xl px-4 py-4 sm:px-6 lg:px-8">
-        <header className={`${scannerActive ? "mb-2" : "mb-4"} flex items-center justify-between gap-2`}>
-          <Link href="/" className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a]" aria-label="Back">
+      <div className="mx-auto max-w-6xl px-2.5 py-2.5 sm:px-6 sm:py-4 lg:px-8">
+        <header className={`${scannerActive ? "mb-1.5" : "mb-2.5 sm:mb-4"} flex items-center justify-between gap-2`}>
+          <Link href="/" className="grid h-9 w-9 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a] sm:h-10 sm:w-10" aria-label="Back">
             <ArrowLeft size={18} />
           </Link>
           {scannerActive ? (
@@ -341,7 +341,7 @@ export default function PackingScreen({ orderId }) {
               </p>
               <button
                 onClick={() => setScannerActive(false)}
-                className="flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white"
+                className="flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-xs font-bold text-white sm:min-h-9 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-sm"
               >
                 <Square size={15} />
                 Stop
@@ -350,7 +350,7 @@ export default function PackingScreen({ orderId }) {
           ) : (
             <div className="min-w-0 flex-1">
               <StoreBrand compact />
-              <p className="mt-1 truncate text-xs text-black/55 dark:text-white/55">
+              <p className="mt-0.5 truncate text-xs text-black/55 dark:text-white/55 sm:mt-1">
                 {order.customerName} - Invoice {order.invoiceNo}
               </p>
             </div>
@@ -358,33 +358,33 @@ export default function PackingScreen({ orderId }) {
         </header>
 
         {packed && (
-          <section className="mb-4 flex items-center gap-3 rounded-lg bg-emerald-600 p-4 text-white shadow-soft">
-            <CheckCircle2 size={28} />
+          <section className="mb-2.5 flex items-center gap-2 rounded-lg bg-emerald-600 p-2.5 text-white shadow-sm sm:mb-4 sm:gap-3 sm:p-4 sm:shadow-soft">
+            <CheckCircle2 size={22} />
             <div>
-              <p className="font-black">Order Completed</p>
-              <p className="text-sm text-white/80">All items are packed and saved for history.</p>
+              <p className="text-sm font-black sm:text-base">Order Completed</p>
+              <p className="text-xs text-white/80 sm:text-sm">All items are packed and saved for history.</p>
             </div>
           </section>
         )}
 
         {scannerActive ? (
-          <div className="space-y-3">
-            <div className="grid gap-3 lg:grid-cols-[280px_1fr] lg:items-start">
-              <div className="mx-auto w-full max-w-[280px] lg:sticky lg:top-3">
+          <div className="space-y-2">
+            <div className="grid gap-2 lg:grid-cols-[240px_1fr] lg:items-start">
+              <div className="mx-auto w-full max-w-[220px] sm:max-w-[260px] lg:sticky lg:top-3">
                 {scanner}
               </div>
               {checklist}
             </div>
-            <section className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
+            <section className="rounded-lg bg-white p-2.5 shadow-sm dark:bg-[#151f1a] sm:p-4">
               <ProgressRing packed={progress.packedQuantity} total={progress.totalQuantity} />
             </section>
           </div>
         ) : (
-          <div className="grid gap-5 lg:grid-cols-[420px_1fr]">
-            <div className="space-y-4">
-              <section className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
+          <div className="grid gap-3 lg:grid-cols-[340px_1fr] lg:gap-5">
+            <div className="space-y-2.5 sm:space-y-4">
+              <section className="rounded-lg bg-white p-2.5 shadow-sm dark:bg-[#151f1a] sm:p-4">
                 <ProgressRing packed={progress.packedQuantity} total={progress.totalQuantity} />
-                <div className="mt-4">
+                <div className="mt-2.5 sm:mt-4">
                   {scannerButton}
                 </div>
               </section>
@@ -397,30 +397,30 @@ export default function PackingScreen({ orderId }) {
         )}
       </div>
       {addItemOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-3 sm:place-items-center">
-          <form onSubmit={handleAddItem} className="w-full max-w-md rounded-lg bg-white p-4 shadow-soft dark:bg-[#151f1a]">
-            <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-2.5 sm:place-items-center sm:p-3">
+          <form onSubmit={handleAddItem} className="w-full max-w-md rounded-lg bg-white p-3 shadow-soft dark:bg-[#151f1a] sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
               <div>
-                <h2 className="text-lg font-black">Add Item</h2>
+                <h2 className="text-base font-black sm:text-lg">Add Item</h2>
                 <p className="text-xs text-black/55 dark:text-white/55">This item will appear in the checklist immediately.</p>
               </div>
               <button
                 type="button"
                 onClick={() => setAddItemOpen(false)}
-                className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#101712]"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#101712] sm:h-10 sm:w-10"
                 aria-label="Close add item"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="grid gap-3">
+            <div className="grid gap-2.5 sm:gap-3">
               <label className="grid gap-1.5 text-sm font-bold">
                 Item name
                 <input
                   value={itemDraft.productName}
                   onChange={(event) => setItemDraft((current) => ({ ...current, productName: event.target.value }))}
-                  className="rounded-lg border border-black/10 bg-white px-3 py-3 font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                  className="rounded-lg border border-black/10 bg-white px-3 py-2.5 font-semibold outline-none focus:border-leaf dark:bg-[#101712] sm:py-3"
                   placeholder="Enter item name"
                   autoFocus
                 />
@@ -430,11 +430,11 @@ export default function PackingScreen({ orderId }) {
                 <input
                   value={itemDraft.hsnOrBarcode}
                   onChange={(event) => setItemDraft((current) => ({ ...current, hsnOrBarcode: event.target.value }))}
-                  className="rounded-lg border border-black/10 bg-white px-3 py-3 font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                  className="rounded-lg border border-black/10 bg-white px-3 py-2.5 font-semibold outline-none focus:border-leaf dark:bg-[#101712] sm:py-3"
                   placeholder="Barcode / item code optional"
                 />
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
                 <label className="grid gap-1.5 text-sm font-bold">
                   Qty
                   <input
@@ -443,7 +443,7 @@ export default function PackingScreen({ orderId }) {
                     step="0.001"
                     value={itemDraft.quantity}
                     onChange={(event) => setItemDraft((current) => ({ ...current, quantity: event.target.value }))}
-                    className="rounded-lg border border-black/10 bg-white px-3 py-3 font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                    className="rounded-lg border border-black/10 bg-white px-3 py-2.5 font-semibold outline-none focus:border-leaf dark:bg-[#101712] sm:py-3"
                   />
                 </label>
                 <label className="grid gap-1.5 text-sm font-bold">
@@ -454,14 +454,14 @@ export default function PackingScreen({ orderId }) {
                     step="0.01"
                     value={itemDraft.pricePerUnit}
                     onChange={(event) => setItemDraft((current) => ({ ...current, pricePerUnit: event.target.value }))}
-                    className="rounded-lg border border-black/10 bg-white px-3 py-3 font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                    className="rounded-lg border border-black/10 bg-white px-3 py-2.5 font-semibold outline-none focus:border-leaf dark:bg-[#101712] sm:py-3"
                     placeholder="0"
                   />
                 </label>
               </div>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5">
               <button
                 type="button"
                 onClick={() => setAddItemOpen(false)}
@@ -482,11 +482,11 @@ export default function PackingScreen({ orderId }) {
         </div>
       )}
       {partyNameOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-3 sm:place-items-center">
-          <form onSubmit={(event) => { event.preventDefault(); handleSavePartyName(); }} className="w-full max-w-md rounded-lg bg-white p-4 shadow-soft dark:bg-[#151f1a]">
-            <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-2.5 sm:place-items-center sm:p-3">
+          <form onSubmit={(event) => { event.preventDefault(); handleSavePartyName(); }} className="w-full max-w-md rounded-lg bg-white p-3 shadow-soft dark:bg-[#151f1a] sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
               <div>
-                <h2 className="text-lg font-black">Change Party Name</h2>
+                <h2 className="text-base font-black sm:text-lg">Change Party Name</h2>
                 <p className="text-xs text-black/55 dark:text-white/55">This change will be saved to the order immediately.</p>
               </div>
               <button
@@ -495,7 +495,7 @@ export default function PackingScreen({ orderId }) {
                   setPartyName(order.customerName || "");
                   setPartyNameOpen(false);
                 }}
-                className="grid h-10 w-10 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#101712]"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#101712] sm:h-10 sm:w-10"
                 aria-label="Close party name editor"
               >
                 <X size={18} />
@@ -507,13 +507,13 @@ export default function PackingScreen({ orderId }) {
               <input
                 value={partyName}
                 onChange={(event) => setPartyName(event.target.value)}
-                className="rounded-lg border border-black/10 bg-white px-3 py-3 font-semibold outline-none focus:border-leaf dark:bg-[#101712]"
+                className="rounded-lg border border-black/10 bg-white px-3 py-2.5 font-semibold outline-none focus:border-leaf dark:bg-[#101712] sm:py-3"
                 placeholder="Enter party name"
                 autoFocus
               />
             </label>
 
-            <div className="mt-5 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5">
               <button
                 type="button"
                 onClick={() => {
