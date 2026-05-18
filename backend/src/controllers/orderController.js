@@ -342,6 +342,32 @@ export async function removePackedOrderItem(req, res) {
   });
 }
 
+export async function removeOnePackedOrderItem(req, res) {
+  const order = await Order.findById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const item = getOrderItemByIndex(order, req.params.itemIndex);
+  if (!item) {
+    return res.status(404).json({ message: "Order item not found" });
+  }
+
+  if ((item.packedQuantity || 0) <= 0) {
+    return res.status(409).json({ message: `${item.productName} has no packed quantity to remove` });
+  }
+
+  item.packedQuantity = Math.max(0, (item.packedQuantity || 0) - 1);
+  order.recalculateStatus();
+  await order.save();
+
+  const populated = await populateOrder(Order.findById(order._id));
+  res.json({
+    message: `1 packed quantity removed from ${item.productName}`,
+    order: populated
+  });
+}
+
 export async function uploadInvoice(req, res) {
   try {
     if (!req.file?.buffer) {

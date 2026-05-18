@@ -107,6 +107,10 @@ export const api = {
     request(`/api/orders/${orderId}/items/${itemIndex}/manual-pack-full`, "post", {
       data: { scannedBy }
     }),
+  removeOnePackedOrderItem: (orderId, itemIndex) =>
+    request(`/api/orders/${orderId}/items/${itemIndex}/remove-pack-one`, "post", {
+      data: {}
+    }),
   removePackedOrderItem: (orderId, itemIndex) =>
     request(`/api/orders/${orderId}/items/${itemIndex}/remove-pack`, "post", {
       data: {}

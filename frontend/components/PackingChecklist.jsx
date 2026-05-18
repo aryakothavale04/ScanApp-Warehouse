@@ -21,7 +21,7 @@ function createDraft(item) {
   };
 }
 
-export default function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManualPackFull, onRemovePacked, onUpdateItem, onError, scanningMode = false }) {
+export default function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManualPackFull, onRemoveOnePacked, onRemovePacked, onUpdateItem, onError, scanningMode = false }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
@@ -96,6 +96,17 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
     }
   }
 
+  async function removeOnePacked(index) {
+    try {
+      setBusyAction(`remove-one-${index}`);
+      await onRemoveOnePacked(index);
+    } catch (error) {
+      onError?.(error.message);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   return (
     <section className="space-y-2.5 sm:space-y-4">
       {!scanningMode && (
@@ -115,6 +126,7 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
           const barcodeLabel = getBarcodeLabel(item);
           const isEditing = editingIndex === index;
           const canManualPack = !done;
+          const canRemoveOnePacked = (item.packedQuantity || 0) > 0;
 
           return (
             <article
@@ -190,6 +202,18 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                         <CheckCheck size={14} />
                       </button>
                     </>
+                  )}
+                  {scanningMode && canRemoveOnePacked && (
+                    <button
+                      type="button"
+                      onClick={() => removeOnePacked(index)}
+                      disabled={busyAction === `remove-one-${index}`}
+                      className="grid h-7 w-7 place-items-center rounded-full border border-red-200 bg-white text-red-700 shadow-sm disabled:opacity-60 sm:h-8 sm:w-8"
+                      aria-label={`Remove one packed quantity from ${item.productName || "product"}`}
+                      title="Unpack 1 qty"
+                    >
+                      <Minus size={14} />
+                    </button>
                   )}
                 </div>
               </div>
@@ -278,14 +302,24 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                         </button>
                       </>
                     )}
+                    {canRemoveOnePacked && (
+                      <button
+                        onClick={() => removeOnePacked(index)}
+                        disabled={busyAction === `remove-one-${index}`}
+                        className="flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
+                      >
+                        <Minus size={16} />
+                        Unpack 1 qty
+                      </button>
+                    )}
                     {done && (
                       <button
                         onClick={() => removePacked(index)}
                         disabled={busyAction === `remove-${index}`}
                         className="flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                       >
-                        <Minus size={16} />
-                        Remove packed
+                        <X size={16} />
+                        Reset packed
                       </button>
                     )}
                   </div>

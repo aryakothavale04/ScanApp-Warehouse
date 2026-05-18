@@ -218,6 +218,13 @@ export default function PackingScreen({ orderId }) {
     setToast({ type: "success", message: data.message || "Packed item removed" });
   }, [orderId]);
 
+  const handleRemoveOnePackedItem = useCallback(async (itemIndex) => {
+    const data = await api.removeOnePackedOrderItem(orderId, itemIndex);
+    setOrder(data.order);
+    setPartyName(data.order?.customerName || "");
+    setToast({ type: "success", message: data.message || "1 packed quantity removed" });
+  }, [orderId]);
+
   const handleSavePartyName = useCallback(async () => {
     setSavingParty(true);
     try {
@@ -319,6 +326,7 @@ export default function PackingScreen({ orderId }) {
       lastPackedItemId={lastPackedItemId}
       onManualPack={handleManualPackItem}
       onManualPackFull={handleManualPackFullItem}
+      onRemoveOnePacked={handleRemoveOnePackedItem}
       onRemovePacked={handleRemovePackedItem}
       onUpdateItem={handleUpdateItem}
       onError={(message) => setToast({ type: "error", message })}
