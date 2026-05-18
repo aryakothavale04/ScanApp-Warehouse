@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCheck, Edit3, PackageCheck, PackageX, RotateCcw, Save, X } from "lucide-react";
+import { Check, CheckCheck, Edit3, Minus, PackageX, Plus, Save, X } from "lucide-react";
 import { useState } from "react";
 
 function getBarcodeLabel(item) {
@@ -177,7 +177,7 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                         aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
                         title="Only 1 qty packed"
                       >
-                        <PackageCheck size={14} />
+                        <Plus size={14} />
                       </button>
                       <button
                         type="button"
@@ -273,7 +273,7 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                           disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
                           className="flex min-h-9 items-center gap-1.5 rounded-lg bg-leaf px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                         >
-                          <PackageCheck size={16} />
+                          <Plus size={16} />
                           Only 1 qty packed
                         </button>
                       </>
@@ -284,7 +284,7 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                         disabled={busyAction === `remove-${index}`}
                         className="flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                       >
-                        <RotateCcw size={16} />
+                        <Minus size={16} />
                         Remove packed
                       </button>
                     )}
