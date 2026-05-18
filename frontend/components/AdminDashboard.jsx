@@ -3,7 +3,7 @@
 import { Boxes, CheckCircle2, TimerReset, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { api } from "@/src/lib/api";
+import { api, clearStoredAccessCode } from "@/src/lib/api";
 import OrderCard from "./OrderCard";
 import StoreBrand from "./StoreBrand";
 import Toast from "./Toast";
@@ -13,6 +13,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
   const [trashedOrders, setTrashedOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
   async function loadOrders() {
@@ -30,6 +31,11 @@ export default function AdminDashboard() {
 
   function removeOrder(orderId) {
     setOrders((currentOrders) => currentOrders.filter((order) => order._id !== orderId));
+  }
+
+  function logout() {
+    clearStoredAccessCode();
+    window.dispatchEvent(new Event("scanapp-auth-required"));
   }
 
   useEffect(() => {
@@ -174,7 +180,44 @@ export default function AdminDashboard() {
             </div>
           )}
         </section>
+        <section className="mt-5 border-t border-black/10 pt-4 dark:border-white/10 sm:mt-6">
+          <button
+            type="button"
+            onClick={() => setLogoutOpen(true)}
+            className="min-h-11 w-full rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 shadow-sm dark:border-red-900/70 dark:bg-[#151f1a] dark:text-red-300 sm:w-auto"
+          >
+            Log Out
+          </button>
+        </section>
       </div>
+      {logoutOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-2.5 sm:place-items-center sm:p-3">
+          <section className="w-full max-w-md rounded-lg bg-white p-3 shadow-soft dark:bg-[#151f1a] sm:p-4">
+            <div className="mb-4">
+              <h2 className="text-base font-black sm:text-lg">Log out?</h2>
+              <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                You will need to enter the access code again to open the app.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setLogoutOpen(false)}
+                className="min-h-11 rounded-lg border border-black/10 px-4 py-2 text-sm font-bold dark:border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={logout}
+                className="min-h-11 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white"
+              >
+                Log Out
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
