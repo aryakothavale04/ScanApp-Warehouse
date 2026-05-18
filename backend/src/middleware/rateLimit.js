@@ -1,17 +1,24 @@
+import mongoose from "mongoose";
+
 function getClientKey(req) {
   return req.ip || req.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 }
 
-export function createRateLimiter({ windowMs, maxRequests, message }) {
-  const hits = new Map();
+const memoryHits = new Map();
+let indexReady = null;
 
-  return function rateLimiter(req, res, next) {
+function getBucketId(key, windowMs) {
+  return `${key}:${windowMs}:${Math.floor(Date.now() / windowMs)}`;
+}
+
+function createMemoryRateLimiter({ windowMs, maxRequests, message }) {
+  return function memoryRateLimiter(req, res, next) {
     const now = Date.now();
     const key = getClientKey(req);
-    const current = hits.get(key);
+    const current = memoryHits.get(key);
 
     if (!current || current.resetAt <= now) {
-      hits.set(key, { count: 1, resetAt: now + windowMs });
+      memoryHits.set(key, { count: 1, resetAt: now + windowMs });
       next();
       return;
     }
@@ -28,5 +35,55 @@ export function createRateLimiter({ windowMs, maxRequests, message }) {
     }
 
     next();
+  };
+}
+
+async function ensureRateLimitIndexes(collection) {
+  indexReady ||= collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+  await indexReady;
+}
+
+export function createRateLimiter({ windowMs, maxRequests, message }) {
+  const fallbackLimiter = createMemoryRateLimiter({ windowMs, maxRequests, message });
+
+  return async function rateLimiter(req, res, next) {
+    if (mongoose.connection.readyState !== 1) {
+      fallbackLimiter(req, res, next);
+      return;
+    }
+
+    try {
+      const now = new Date();
+      const resetAt = new Date(now.getTime() + windowMs);
+      const collection = mongoose.connection.collection("rate_limits");
+      await ensureRateLimitIndexes(collection);
+
+      const result = await collection.findOneAndUpdate(
+        { _id: getBucketId(getClientKey(req), windowMs) },
+        {
+          $inc: { count: 1 },
+          $setOnInsert: { resetAt, expiresAt: resetAt }
+        },
+        {
+          upsert: true,
+          returnDocument: "after"
+        }
+      );
+
+      const current = result.value || result;
+      if ((current?.count || 0) > maxRequests) {
+        const retryAfterSeconds = Math.max(1, Math.ceil((new Date(current.resetAt).getTime() - Date.now()) / 1000));
+        res.set("Retry-After", retryAfterSeconds.toString());
+        res.status(429).json({
+          success: false,
+          message: message || "Too many requests. Please wait and try again."
+        });
+        return;
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
   };
 }

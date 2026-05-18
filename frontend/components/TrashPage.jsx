@@ -15,6 +15,7 @@ export default function TrashPage() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  const [deleteOrder, setDeleteOrder] = useState(null);
   const [toast, setToast] = useState(null);
 
   async function loadTrash() {
@@ -47,11 +48,11 @@ export default function TrashPage() {
   }
 
   async function permanentlyDeleteOrder(orderId) {
-    if (!window.confirm("Permanently delete this order now? This cannot be undone.")) return;
     setBusyId(orderId);
     try {
       await api.permanentlyDeleteOrder(orderId);
       setOrders((current) => current.filter((order) => order._id !== orderId));
+      setDeleteOrder(null);
       setToast({ type: "success", message: "Order permanently deleted" });
     } catch (error) {
       setToast({ type: "error", message: error.message });
@@ -103,7 +104,7 @@ export default function TrashPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => permanentlyDeleteOrder(order._id)}
+                    onClick={() => setDeleteOrder(order)}
                     disabled={busyId === order._id}
                     className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 disabled:opacity-60 dark:border-red-900/70 dark:bg-[#151f1a] dark:text-red-300"
                   >
@@ -121,6 +122,37 @@ export default function TrashPage() {
           </div>
         )}
       </div>
+      {deleteOrder && (
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-2.5 sm:place-items-center sm:p-3">
+          <section className="w-full max-w-md rounded-lg bg-white p-3 shadow-soft dark:bg-[#151f1a] sm:p-4">
+            <div className="mb-4">
+              <h2 className="text-base font-black sm:text-lg">Delete order permanently?</h2>
+              <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                {deleteOrder.invoiceNo} for {deleteOrder.customerName} will be removed from trash.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteOrder(null)}
+                disabled={busyId === deleteOrder._id}
+                className="min-h-11 rounded-lg border border-black/10 px-4 py-2 text-sm font-bold dark:border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => permanentlyDeleteOrder(deleteOrder._id)}
+                disabled={busyId === deleteOrder._id}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {busyId === deleteOrder._id ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                Delete
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

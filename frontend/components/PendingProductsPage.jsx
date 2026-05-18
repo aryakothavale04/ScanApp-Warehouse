@@ -295,7 +295,8 @@ export default function PendingProductsPage() {
       const url = URL.createObjectURL(pdf);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `pending-products-${new Date().toISOString().slice(0, 10)}.pdf`;
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      link.download = `pending-products-${timestamp}.pdf`;
       document.body.appendChild(link);
       link.click();
       link.remove();

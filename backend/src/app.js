@@ -32,7 +32,9 @@ export function createApp() {
   app.use(cors(corsOptions));
   app.options("*", cors(corsOptions));
   app.use(express.json({ limit: "1mb" }));
-  app.use(morgan("dev"));
+  if (process.env.NODE_ENV !== "test") {
+    app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+  }
   const apiRateLimit = createRateLimiter({
     windowMs: 60 * 1000,
     maxRequests: Number.parseInt(process.env.API_RATE_LIMIT_PER_MINUTE || "300", 10)

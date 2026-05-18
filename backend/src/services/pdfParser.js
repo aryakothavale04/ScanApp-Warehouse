@@ -357,7 +357,7 @@ function mergeInvoiceItems(items) {
   return Array.from(merged.values());
 }
 
-function extractItems(lines) {
+export function extractItems(lines) {
   const candidates = [...extractVyaparItems(lines)];
   if (candidates.length) return mergeInvoiceItems(candidates);
 
@@ -511,3 +511,9 @@ export async function parseVyaparInvoice(buffer) {
     throw Object.assign(new Error(message), { statusCode: 422, cause: error });
   }
 }
+
+export const pdfParserInternals = {
+  parseVyaparRow,
+  parseAmountTail,
+  splitTrailingInferredQuantity
+};
