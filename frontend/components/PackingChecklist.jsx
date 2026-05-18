@@ -151,6 +151,18 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                   <div className={`grid place-items-center rounded-full ${scanningMode ? "h-8 w-8" : "h-10 w-10"} ${done ? "bg-emerald-600 text-white" : "bg-black/5 text-black/40 dark:bg-white/10 dark:text-white/50"}`}>
                     {done ? <Check size={scanningMode ? 18 : 22} /> : <PackageX size={scanningMode ? 17 : 20} />}
                   </div>
+                  {scanningMode && canManualPack && (
+                    <button
+                      type="button"
+                      onClick={() => manualPack(index)}
+                      disabled={busyAction === `pack-${index}`}
+                      className="grid h-8 w-8 place-items-center rounded-full bg-emerald-600 text-white shadow-sm disabled:opacity-60"
+                      aria-label={`Mark ${item.productName || "product"} packed manually`}
+                      title="Mark packed manually"
+                    >
+                      <PackageCheck size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
 
