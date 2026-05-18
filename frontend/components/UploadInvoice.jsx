@@ -40,9 +40,6 @@ export default function UploadInvoice({ onUploaded, onToast }) {
         {loading ? <Loader2 className="animate-spin" size={18} /> : <FileUp size={18} />}
         Vyapar PDF Upload
       </button>
-      <p className="mt-1.5 text-center text-[11px] text-black/55 dark:text-white/55 sm:mt-3 sm:text-xs">
-        Invoice no, customer, items and quantity are extracted automatically.
-      </p>
     </section>
   );
 }
