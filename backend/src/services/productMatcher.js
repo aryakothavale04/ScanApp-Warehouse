@@ -39,6 +39,7 @@ export async function hydrateInvoiceItems(items) {
     const product = await findProductForInvoiceName(item.productName, item.hsnOrBarcode);
     hydrated.push({
       productId: product?._id,
+      serialNo: item.serialNo,
       productName: product?.productName || item.productName,
       hsnOrBarcode: item.hsnOrBarcode || "",
       quantity: item.quantity,

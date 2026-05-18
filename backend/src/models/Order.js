@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 const orderItemSchema = new mongoose.Schema(
   {
     productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
+    serialNo: { type: Number, min: 1 },
     productName: { type: String, required: true, trim: true },
     hsnOrBarcode: { type: String, trim: true },
     quantity: { type: Number, required: true, min: 0.001 },

@@ -130,7 +130,12 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                     </div>
                   ) : (
                     <>
-                      <h3 className={`font-bold leading-tight ${scanningMode ? "text-sm" : ""}`}>{item.productName}</h3>
+                      <h3 className={`flex items-start gap-2 font-bold leading-tight ${scanningMode ? "text-sm" : ""}`}>
+                        {item.serialNo ? (
+                          <span className="shrink-0 text-black/45 dark:text-white/45">{item.serialNo}.</span>
+                        ) : null}
+                        <span className="min-w-0">{item.productName}</span>
+                      </h3>
                       <p className={`mt-1 text-black/55 dark:text-white/55 ${scanningMode ? "text-xs" : "text-sm"}`}>
                         HSN / Barcode: {barcodeLabel}
                       </p>

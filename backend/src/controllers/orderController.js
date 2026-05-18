@@ -153,6 +153,7 @@ export async function addOrderItem(req, res) {
   }
 
   order.items.push({
+    serialNo: order.items.reduce((highest, item) => Math.max(highest, item.serialNo || 0), 0) + 1,
     productName: productName.trim(),
     hsnOrBarcode: (hsnOrBarcode || barcode || "").toString().trim(),
     quantity: nextQuantity,

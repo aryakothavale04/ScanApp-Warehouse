@@ -464,7 +464,10 @@ export async function parseVyaparInvoice(buffer) {
       throw Object.assign(new Error("PDF has no readable invoice text. Please upload the original Vyapar PDF, not a photo or scanned PDF."), { statusCode: 422 });
     }
 
-    const items = extractItems(lines);
+    const items = extractItems(lines).map((item, index) => ({
+      ...item,
+      serialNo: index + 1
+    }));
 
     if (!items.length) {
       throw Object.assign(new Error("No invoice items found. Please check the Vyapar PDF format."), { statusCode: 422 });
