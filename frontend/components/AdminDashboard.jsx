@@ -78,6 +78,13 @@ export default function AdminDashboard() {
       value: stats.completedOrderCount,
       icon: CheckCircle2,
       color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-100"
+    },
+    {
+      href: "/trash",
+      label: "Trash",
+      value: "",
+      icon: Trash2,
+      color: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-100"
     }
   ];
 
@@ -87,12 +94,9 @@ export default function AdminDashboard() {
       <div className="mx-auto max-w-6xl px-2.5 py-2.5 sm:px-5 sm:py-4 lg:px-8">
         <header className="mb-2.5 flex items-center justify-between gap-3 sm:mb-5">
           <StoreBrand />
-          <Link href="/trash" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-black/10 bg-white text-red-700 shadow-sm dark:border-white/10 dark:bg-[#151f1a] dark:text-red-300" aria-label="Trash" title="Trash">
-            <Trash2 size={17} />
-          </Link>
         </header>
 
-        <div className="mb-3 grid grid-cols-3 gap-1.5 sm:mb-4 sm:gap-2">
+        <div className="mb-3 grid grid-cols-2 gap-1.5 sm:mb-4 sm:grid-cols-4 sm:gap-2">
           {cards.map((card) => {
             const Icon = card.icon;
             const content = (
@@ -102,7 +106,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[10px] font-semibold leading-tight text-black/50 dark:text-white/50 sm:text-[11px]">{card.label}</p>
-                  <p className="text-base font-black leading-tight sm:text-xl">{card.value}</p>
+                  <p className="text-base font-black leading-tight sm:text-xl">{card.value || "\u00a0"}</p>
                 </div>
               </>
             );
