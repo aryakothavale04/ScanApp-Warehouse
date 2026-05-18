@@ -241,6 +241,26 @@ function extractQuantityFromName(name) {
   return packMatch ? toNumber(packMatch[1]) : null;
 }
 
+function splitTrailingInferredQuantity(name, inferredQuantity) {
+  const roundedInferredQuantity = Math.round(inferredQuantity);
+  if (
+    !Number.isFinite(inferredQuantity) ||
+    !Number.isFinite(roundedInferredQuantity) ||
+    Math.abs(inferredQuantity - roundedInferredQuantity) > 0.001
+  ) {
+    return null;
+  }
+
+  const trailingQuantityMatch = name.match(/(?:^|\s)(\d+(?:\.\d+)?)$/);
+  if (!trailingQuantityMatch) return null;
+
+  const trailingQuantity = toNumber(trailingQuantityMatch[1]);
+  if (Math.abs(trailingQuantity - roundedInferredQuantity) > 0.001) return null;
+
+  const productName = name.slice(0, trailingQuantityMatch.index).trim();
+  return productName ? { productName, quantity: roundedInferredQuantity } : null;
+}
+
 function parseVyaparRow(row) {
   if (!row || isLikelyHeaderLine(row)) return null;
 
@@ -282,6 +302,12 @@ function parseVyaparRow(row) {
       const leadingNameDigits = hsnOrBarcode.slice(0, -13);
       hsnOrBarcode = hsnOrBarcode.slice(-13);
       productName = `${productName}${leadingNameDigits}`.trim();
+    }
+  } else if (quantity === null) {
+    const splitQuantity = splitTrailingInferredQuantity(productName, inferredQuantity);
+    if (splitQuantity) {
+      productName = splitQuantity.productName;
+      quantity = splitQuantity.quantity;
     }
   }
 
