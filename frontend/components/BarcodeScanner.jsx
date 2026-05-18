@@ -44,34 +44,67 @@ export default function BarcodeScanner({ active, onScan, onError, compact = fals
           formatsToSupport
         });
         scannerRef.current = scanner;
-        await scanner.start(
-          {
-            facingMode: "environment",
-            advanced: [
-              { focusMode: "continuous" },
-              { exposureMode: "continuous" }
-            ]
+        const scannerConfig = {
+          fps: 24,
+          disableFlip: true,
+          rememberLastUsedCamera: true,
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const width = Math.floor(Math.min(viewfinderWidth * 0.9, compact ? 260 : 430));
+            const height = Math.floor(Math.min(viewfinderHeight * 0.28, compact ? 96 : 150));
+            return { width, height };
           },
-          {
-            fps: 24,
-            disableFlip: true,
-            rememberLastUsedCamera: true,
-            qrbox: (viewfinderWidth, viewfinderHeight) => {
-              const width = Math.floor(Math.min(viewfinderWidth * 0.9, compact ? 260 : 430));
-              const height = Math.floor(Math.min(viewfinderHeight * 0.28, compact ? 96 : 150));
-              return { width, height };
-            },
-            aspectRatio: 1.777
-          },
-          (decodedText) => {
-            const now = Date.now();
-            if (lastScanRef.current.value === decodedText && now - lastScanRef.current.at < 650) return;
-            lastScanRef.current = { value: decodedText, at: now };
-            Promise.resolve(onScanRef.current(decodedText)).catch((error) => {
-              onErrorRef.current?.(error.message || "Scan failed");
-            });
+          aspectRatio: 1.777
+        };
+        const fallbackScannerConfig = {
+          fps: 15,
+          disableFlip: true,
+          qrbox: (viewfinderWidth, viewfinderHeight) => {
+            const width = Math.floor(Math.min(viewfinderWidth * 0.86, compact ? 250 : 380));
+            const height = Math.floor(Math.min(viewfinderHeight * 0.32, compact ? 110 : 170));
+            return { width, height };
           }
-        );
+        };
+        const onDecoded = (decodedText) => {
+          const now = Date.now();
+          if (lastScanRef.current.value === decodedText && now - lastScanRef.current.at < 650) return;
+          lastScanRef.current = { value: decodedText, at: now };
+          Promise.resolve(onScanRef.current(decodedText)).catch((error) => {
+            onErrorRef.current?.(error.message || "Scan failed");
+          });
+        };
+
+        const onDecodeError = () => {};
+
+        try {
+          await scanner.start(
+            {
+              facingMode: "environment",
+              advanced: [
+                { focusMode: "continuous" },
+                { exposureMode: "continuous" }
+              ]
+            },
+            scannerConfig,
+            onDecoded,
+            onDecodeError
+          );
+        } catch {
+          try {
+            await scanner.start(
+              { facingMode: "environment" },
+              scannerConfig,
+              onDecoded,
+              onDecodeError
+            );
+          } catch {
+            await scanner.start(
+              { facingMode: "environment" },
+              fallbackScannerConfig,
+              onDecoded,
+              onDecodeError
+            );
+          }
+        }
         if (!disposed) setReady(true);
       } catch (error) {
         onErrorRef.current?.(error.message || "Camera scanner could not start");
