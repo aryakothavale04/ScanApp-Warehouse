@@ -79,6 +79,8 @@ export default function PackingScreen({ orderId }) {
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [partyNameOpen, setPartyNameOpen] = useState(false);
   const scanLoadingRef = useRef(false);
+  const hardwareScanBufferRef = useRef("");
+  const hardwareScanTimerRef = useRef(null);
   const lastWrongScanRef = useRef({ value: "", at: 0 });
 
   const loadOrder = useCallback(async () => {
@@ -133,6 +135,52 @@ export default function PackingScreen({ orderId }) {
       setScanLoading(false);
     }
   }, [orderId]);
+
+  useEffect(() => {
+    if (!scannerActive) return undefined;
+
+    function clearHardwareScanTimer() {
+      if (!hardwareScanTimerRef.current) return;
+      window.clearTimeout(hardwareScanTimerRef.current);
+      hardwareScanTimerRef.current = null;
+    }
+
+    function submitHardwareScan() {
+      const barcode = hardwareScanBufferRef.current.trim();
+      hardwareScanBufferRef.current = "";
+      clearHardwareScanTimer();
+      if (barcode.length < 2) return;
+      handleScan(barcode);
+    }
+
+    function handleHardwareScannerKeydown(event) {
+      const target = event.target;
+      const isEditableTarget = target?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName);
+      if (isEditableTarget || event.ctrlKey || event.altKey || event.metaKey) return;
+
+      if (event.key === "Enter" || event.key === "Tab") {
+        event.preventDefault();
+        submitHardwareScan();
+        return;
+      }
+
+      if (event.key.length !== 1) return;
+
+      hardwareScanBufferRef.current += event.key;
+      clearHardwareScanTimer();
+      hardwareScanTimerRef.current = window.setTimeout(() => {
+        if (hardwareScanBufferRef.current.trim().length >= 4) submitHardwareScan();
+        else hardwareScanBufferRef.current = "";
+      }, 120);
+    }
+
+    window.addEventListener("keydown", handleHardwareScannerKeydown);
+    return () => {
+      window.removeEventListener("keydown", handleHardwareScannerKeydown);
+      hardwareScanBufferRef.current = "";
+      clearHardwareScanTimer();
+    };
+  }, [handleScan, scannerActive]);
 
   const handleUpdateItem = useCallback(async (itemIndex, item) => {
     const data = await api.updateOrderItem(orderId, itemIndex, item);
