@@ -1,6 +1,7 @@
 import "./globals.css";
 import AccessCodeGate from "@/components/AccessCodeGate";
 import BackendStatusGate from "@/components/BackendStatusGate";
+import FooterCredit from "@/components/FooterCredit";
 
 export const metadata = {
   title: "ScanApp Packing",
@@ -27,6 +28,7 @@ export default function RootLayout({ children }) {
       <body>
         <BackendStatusGate>
           <AccessCodeGate>{children}</AccessCodeGate>
+          <FooterCredit />
         </BackendStatusGate>
       </body>
     </html>

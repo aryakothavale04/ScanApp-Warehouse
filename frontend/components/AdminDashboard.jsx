@@ -11,14 +11,16 @@ import UploadInvoice from "./UploadInvoice";
 
 export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
+  const [trashedOrders, setTrashedOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState(null);
 
   async function loadOrders() {
     setLoading(true);
     try {
-      const data = await api.orders();
-      setOrders(data.orders || []);
+      const [ordersData, trashData] = await Promise.all([api.orders(), api.trashedOrders()]);
+      setOrders(ordersData.orders || []);
+      setTrashedOrders(trashData.orders || []);
     } catch (error) {
       setToast({ type: "error", message: error.message });
     } finally {
@@ -53,9 +55,10 @@ export default function AdminDashboard() {
       completedOrders,
       pendingOrderCount: pendingOrders.length,
       completedOrderCount: completedOrders.length,
-      pendingProductQuantity
+      pendingProductQuantity,
+      trashOrderCount: trashedOrders.length
     };
-  }, [orders]);
+  }, [orders, trashedOrders]);
 
   const cards = [
     {
@@ -82,7 +85,7 @@ export default function AdminDashboard() {
     {
       href: "/trash",
       label: "Trash",
-      value: "",
+      value: stats.trashOrderCount,
       icon: Trash2,
       color: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-100"
     }
