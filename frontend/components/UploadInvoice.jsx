@@ -24,7 +24,7 @@ export default function UploadInvoice({ onUploaded, onToast }) {
   }
 
   return (
-    <section className="rounded-lg border border-dashed border-leaf/40 bg-white p-4 shadow-soft dark:border-leaf/50 dark:bg-[#151f1a]">
+    <section className="rounded-lg border border-dashed border-leaf/40 bg-white p-2.5 shadow-sm dark:border-leaf/50 dark:bg-[#151f1a] sm:p-4 sm:shadow-soft">
       <input
         ref={inputRef}
         className="hidden"
@@ -35,12 +35,12 @@ export default function UploadInvoice({ onUploaded, onToast }) {
       <button
         onClick={() => inputRef.current?.click()}
         disabled={loading}
-        className="flex w-full items-center justify-center gap-2 rounded-lg bg-leaf px-4 py-3 font-semibold text-white disabled:opacity-60"
+        className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:min-h-12 sm:px-4 sm:py-3 sm:text-base"
       >
-        {loading ? <Loader2 className="animate-spin" size={20} /> : <FileUp size={20} />}
+        {loading ? <Loader2 className="animate-spin" size={18} /> : <FileUp size={18} />}
         Vyapar PDF Upload
       </button>
-      <p className="mt-3 text-center text-xs text-black/55 dark:text-white/55">
+      <p className="mt-1.5 text-center text-[11px] text-black/55 dark:text-white/55 sm:mt-3 sm:text-xs">
         Invoice no, customer, items and quantity are extracted automatically.
       </p>
     </section>

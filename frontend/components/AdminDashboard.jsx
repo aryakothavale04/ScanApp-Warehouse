@@ -84,22 +84,22 @@ export default function AdminDashboard() {
   return (
     <main className="min-h-screen safe-bottom">
       <Toast toast={toast} onClose={() => setToast(null)} />
-      <div className="mx-auto max-w-6xl px-3 py-3 sm:px-5 lg:px-8">
-        <header className="mb-4 flex items-center justify-between gap-3 sm:mb-5">
+      <div className="mx-auto max-w-6xl px-2.5 py-2.5 sm:px-5 sm:py-4 lg:px-8">
+        <header className="mb-2.5 flex items-center justify-between gap-3 sm:mb-5">
           <StoreBrand />
         </header>
 
-        <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="mb-3 grid grid-cols-3 gap-1.5 sm:mb-4 sm:gap-2">
           {cards.map((card) => {
             const Icon = card.icon;
             const content = (
               <>
-                <div className={`mb-2 grid h-8 w-8 place-items-center rounded-lg ${card.color}`}>
-                  <Icon size={17} />
+                <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg sm:mb-2 sm:h-8 sm:w-8 ${card.color}`}>
+                  <Icon size={15} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-black/50 dark:text-white/50 sm:text-[11px]">{card.label}</p>
-                  <p className="text-2xl font-black sm:text-xl">{card.value}</p>
+                  <p className="truncate text-[10px] font-semibold leading-tight text-black/50 dark:text-white/50 sm:text-[11px]">{card.label}</p>
+                  <p className="text-base font-black leading-tight sm:text-xl">{card.value}</p>
                 </div>
               </>
             );
@@ -108,7 +108,7 @@ export default function AdminDashboard() {
               <Link
                 key={card.label}
                 href={card.href}
-                className="flex min-h-16 items-center gap-3 rounded-lg bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft dark:bg-[#151f1a] sm:block sm:min-h-0"
+                className="flex min-h-12 items-center gap-1.5 rounded-lg bg-white p-2 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft dark:bg-[#151f1a] sm:block sm:min-h-0 sm:p-3"
               >
                 {content}
               </Link>
@@ -116,25 +116,25 @@ export default function AdminDashboard() {
           })}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
+        <div className="grid gap-3 lg:grid-cols-[320px_1fr] lg:gap-4">
           <div>
             <UploadInvoice onUploaded={loadOrders} onToast={setToast} />
           </div>
           <section>
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-base font-bold">Pending Orders</h2>
-              <button onClick={loadOrders} className="min-h-11 rounded-lg border border-black/10 px-4 py-2 text-sm font-semibold dark:border-white/10">
+            <div className="mb-1.5 flex items-center justify-between">
+              <h2 className="text-sm font-bold sm:text-base">Pending Orders</h2>
+              <button onClick={loadOrders} className="min-h-9 rounded-lg border border-black/10 px-3 py-1.5 text-xs font-semibold dark:border-white/10 sm:min-h-10 sm:text-sm">
                 Refresh
               </button>
             </div>
             {loading ? (
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
                 {[1, 2, 3, 4].map((item) => (
-                  <div key={item} className="h-28 animate-pulse rounded-lg bg-black/5 dark:bg-white/10" />
+                  <div key={item} className="h-20 animate-pulse rounded-lg bg-black/5 dark:bg-white/10" />
                 ))}
               </div>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
                 {stats.pendingOrders.map((order) => (
                   <OrderCard key={order._id} order={order} onDeleted={removeOrder} onToast={setToast} compact />
                 ))}
@@ -147,12 +147,12 @@ export default function AdminDashboard() {
             )}
           </section>
         </div>
-        <section id="completed-orders" className="mt-5 sm:mt-6">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-base font-bold">Completed Orders</h2>
+        <section id="completed-orders" className="mt-4 sm:mt-6">
+          <div className="mb-1.5 flex items-center justify-between">
+            <h2 className="text-sm font-bold sm:text-base">Completed Orders</h2>
           </div>
           {loading ? null : (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 lg:grid-cols-3">
               {stats.completedOrders.map((order) => (
                 <OrderCard key={order._id} order={order} onDeleted={removeOrder} onToast={setToast} compact />
               ))}
