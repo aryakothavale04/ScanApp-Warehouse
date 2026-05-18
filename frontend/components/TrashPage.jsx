@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { ArrowLeft, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/src/lib/api";
 import StoreBrand from "./StoreBrand";
@@ -65,17 +64,11 @@ export default function TrashPage() {
     <main className="min-h-screen safe-bottom">
       <Toast toast={toast} onClose={() => setToast(null)} />
       <div className="mx-auto max-w-4xl px-2.5 py-2.5 sm:px-5 sm:py-4">
-        <header className="mb-3 flex items-center gap-2">
-          <Link href="/" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a]" aria-label="Back">
-            <ArrowLeft size={18} />
-          </Link>
-          <div className="min-w-0 flex-1">
-            <StoreBrand compact />
+        <header className="sticky top-0 z-20 -mx-2.5 mb-3 grid gap-1 border-b border-black/5 bg-limewash/95 px-2.5 py-2 backdrop-blur dark:border-white/5 dark:bg-[#101714]/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+          <div className="min-w-0">
+            <StoreBrand />
             <h1 className="mt-0.5 text-sm font-black sm:text-lg">Trash</h1>
           </div>
-          <button onClick={loadTrash} className="min-h-9 rounded-lg border border-black/10 px-3 py-1.5 text-xs font-bold dark:border-white/10">
-            Refresh
-          </button>
         </header>
 
         {loading ? (
