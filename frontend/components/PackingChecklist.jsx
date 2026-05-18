@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Edit3, PackageCheck, PackageX, RotateCcw, Save, X } from "lucide-react";
+import { Check, CheckCheck, Edit3, PackageCheck, PackageX, RotateCcw, Save, X } from "lucide-react";
 import { useState } from "react";
 
 function getBarcodeLabel(item) {
@@ -21,7 +21,7 @@ function createDraft(item) {
   };
 }
 
-export default function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onRemovePacked, onUpdateItem, onError, scanningMode = false }) {
+export default function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManualPackFull, onRemovePacked, onUpdateItem, onError, scanningMode = false }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
@@ -67,6 +67,17 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
     try {
       setBusyAction(`pack-${index}`);
       await onManualPack(index);
+    } catch (error) {
+      onError?.(error.message);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function manualPackFull(index) {
+    try {
+      setBusyAction(`pack-full-${index}`);
+      await onManualPackFull(index);
     } catch (error) {
       onError?.(error.message);
     } finally {
@@ -157,16 +168,28 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                     {done ? <Check size={scanningMode ? 18 : 22} /> : <PackageX size={scanningMode ? 17 : 20} />}
                   </div>
                   {scanningMode && canManualPack && (
-                    <button
-                      type="button"
-                      onClick={() => manualPack(index)}
-                      disabled={busyAction === `pack-${index}`}
-                      className="grid h-8 w-8 place-items-center rounded-full bg-emerald-600 text-white shadow-sm disabled:opacity-60"
-                      aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
-                      title="Add 1 manually"
-                    >
-                      <PackageCheck size={15} />
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => manualPack(index)}
+                        disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
+                        className="grid h-8 w-8 place-items-center rounded-full bg-leaf text-white shadow-sm disabled:opacity-60"
+                        aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
+                        title="Only 1 qty packed"
+                      >
+                        <PackageCheck size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => manualPackFull(index)}
+                        disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
+                        className="grid h-8 w-8 place-items-center rounded-full bg-emerald-600 text-white shadow-sm disabled:opacity-60"
+                        aria-label={`Mark full quantity packed for ${item.productName || "product"}`}
+                        title="Full qty packed"
+                      >
+                        <CheckCheck size={15} />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -236,14 +259,24 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                       </button>
                     )}
                     {canManualPack && (
-                      <button
-                        onClick={() => manualPack(index)}
-                        disabled={busyAction === `pack-${index}`}
-                        className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
-                      >
-                        <PackageCheck size={16} />
-                        Mark packed
-                      </button>
+                      <>
+                        <button
+                          onClick={() => manualPackFull(index)}
+                          disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
+                          className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                        >
+                          <CheckCheck size={16} />
+                          Full qty packed
+                        </button>
+                        <button
+                          onClick={() => manualPack(index)}
+                          disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
+                          className="flex items-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white disabled:opacity-60"
+                        >
+                          <PackageCheck size={16} />
+                          Only 1 qty packed
+                        </button>
+                      </>
                     )}
                     {done && (
                       <button

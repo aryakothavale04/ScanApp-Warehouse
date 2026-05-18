@@ -241,6 +241,41 @@ export async function manuallyPackOrderItem(req, res) {
   });
 }
 
+export async function manuallyPackFullOrderItem(req, res) {
+  const order = await Order.findById(req.params.id);
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const item = getOrderItemByIndex(order, req.params.itemIndex);
+  if (!item) {
+    return res.status(404).json({ message: "Order item not found" });
+  }
+
+  if (item.packedQuantity >= item.quantity) {
+    return res.status(409).json({ message: `Qty completed: ${item.productName} is already fully packed` });
+  }
+
+  item.packedQuantity = item.quantity;
+  order.recalculateStatus();
+  await order.save();
+
+  await PackingLog.create({
+    orderId: order._id,
+    productId: item.productId,
+    scannedAt: new Date(),
+    scannedBy: req.body.scannedBy || "packing-staff",
+    barcode: "manual-full-quantity"
+  });
+
+  const populated = await populateOrder(Order.findById(order._id));
+  res.json({
+    message: populated.packedStatus === "Completed" ? "Order completed" : `${item.productName} full quantity packed`,
+    packedItem: { productId: item.productId, hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
+    order: populated
+  });
+}
+
 export async function manuallyCompleteOrder(req, res) {
   const order = await Order.findById(req.params.id);
   if (!order) {
@@ -295,7 +330,8 @@ export async function removePackedOrderItem(req, res) {
     $or: [
       { productId: item.productId },
       { barcode: normalizeBarcode(item.hsnOrBarcode || item.productId?.barcode) },
-      { barcode: "manual-missing-barcode" }
+      { barcode: "manual-missing-barcode" },
+      { barcode: "manual-full-quantity" }
     ]
   });
 

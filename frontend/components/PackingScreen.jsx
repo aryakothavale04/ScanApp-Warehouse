@@ -200,6 +200,17 @@ export default function PackingScreen({ orderId }) {
     setTimeout(() => setLastPackedItemId(null), 900);
   }, [orderId]);
 
+  const handleManualPackFullItem = useCallback(async (itemIndex) => {
+    const data = await api.manualPackFullOrderItem(orderId, itemIndex);
+    setOrder(data.order);
+    setPartyName(data.order?.customerName || "");
+    setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
+    setToast({ type: "success", message: data.message || "Full quantity packed" });
+    playScanSound("complete");
+    window.navigator.vibrate?.([70, 40, 70]);
+    setTimeout(() => setLastPackedItemId(null), 900);
+  }, [orderId]);
+
   const handleRemovePackedItem = useCallback(async (itemIndex) => {
     const data = await api.removePackedOrderItem(orderId, itemIndex);
     setOrder(data.order);
@@ -307,6 +318,7 @@ export default function PackingScreen({ orderId }) {
       items={order.items}
       lastPackedItemId={lastPackedItemId}
       onManualPack={handleManualPackItem}
+      onManualPackFull={handleManualPackFullItem}
       onRemovePacked={handleRemovePackedItem}
       onUpdateItem={handleUpdateItem}
       onError={(message) => setToast({ type: "error", message })}
