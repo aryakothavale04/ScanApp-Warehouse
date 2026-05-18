@@ -68,12 +68,17 @@ export const api = {
   health: () => request("/api/health"),
   test: () => request("/api/test"),
   orders: () => request("/api/orders"),
+  trashedOrders: () => request("/api/orders/trash"),
   order: (id) => request(`/api/orders/${id}`),
   updateOrder: (id, order) =>
     request(`/api/orders/${id}`, "patch", {
       data: order
     }),
   deleteOrder: (id) => request(`/api/orders/${id}`, "delete"),
+  restoreOrder: (id) => request(`/api/orders/${id}/restore`, "post", {
+    data: {}
+  }),
+  permanentlyDeleteOrder: (id) => request(`/api/orders/${id}/permanent`, "delete"),
   uploadInvoice: (file) => {
     const formData = new FormData();
     formData.append("invoice", file);

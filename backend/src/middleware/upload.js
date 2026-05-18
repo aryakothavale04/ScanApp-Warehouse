@@ -1,7 +1,7 @@
 import multer from "multer";
 
 const storage = multer.memoryStorage();
-const DEFAULT_MAX_INVOICE_SIZE_MB = 50;
+const DEFAULT_MAX_INVOICE_SIZE_MB = 15;
 const maxInvoiceSizeMb = Number.parseInt(process.env.MAX_INVOICE_SIZE_MB || `${DEFAULT_MAX_INVOICE_SIZE_MB}`, 10);
 
 export const invoiceUpload = multer({

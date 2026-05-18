@@ -25,7 +25,8 @@ const orderSchema = new mongoose.Schema(
       enum: ["Pending", "Packed", "Completed"],
       default: "Pending",
       index: true
-    }
+    },
+    trashedAt: { type: Date, index: true }
   },
   { timestamps: true }
 );

@@ -21,7 +21,7 @@ export default function OrderCard({ order, onDeleted, onToast, compact = false }
     setDeleting(true);
     try {
       await api.deleteOrder(order._id);
-      onToast?.({ type: "success", message: "Order deleted" });
+      onToast?.({ type: "success", message: "Order moved to trash" });
       onDeleted?.(order._id);
     } catch (error) {
       onToast?.({ type: "error", message: error.message });
@@ -83,11 +83,11 @@ export default function OrderCard({ order, onDeleted, onToast, compact = false }
           onClick={() => setDeleteOpen(true)}
           disabled={deleting}
           className={`${compact ? "grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40" : "mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"}`}
-          aria-label={`Delete invoice ${order.invoiceNo}`}
-          title="Delete order"
+          aria-label={`Move invoice ${order.invoiceNo} to trash`}
+          title="Move to trash"
         >
           {deleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-          {!compact && "Delete Order"}
+          {!compact && "Move to Trash"}
         </button>
         </div>
       </article>
@@ -100,9 +100,9 @@ export default function OrderCard({ order, onDeleted, onToast, compact = false }
                 <Trash2 size={18} />
               </div>
               <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-black">Delete Order</h2>
+                <h2 className="text-lg font-black">Move to Trash</h2>
                 <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-                  Delete invoice <span className="font-bold text-black dark:text-white">{order.invoiceNo}</span>? This will remove the order and its packing logs.
+                  Move invoice <span className="font-bold text-black dark:text-white">{order.invoiceNo}</span> to trash? It will be permanently deleted after 24 hours.
                 </p>
               </div>
             </div>
@@ -123,7 +123,7 @@ export default function OrderCard({ order, onDeleted, onToast, compact = false }
                 className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
                 {deleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                Delete
+                Move
               </button>
             </div>
           </div>

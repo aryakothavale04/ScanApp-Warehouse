@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, CheckCircle2, TimerReset } from "lucide-react";
+import { Boxes, CheckCircle2, TimerReset, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/src/lib/api";
@@ -87,6 +87,9 @@ export default function AdminDashboard() {
       <div className="mx-auto max-w-6xl px-2.5 py-2.5 sm:px-5 sm:py-4 lg:px-8">
         <header className="mb-2.5 flex items-center justify-between gap-3 sm:mb-5">
           <StoreBrand />
+          <Link href="/trash" className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-black/10 bg-white text-red-700 shadow-sm dark:border-white/10 dark:bg-[#151f1a] dark:text-red-300" aria-label="Trash" title="Trash">
+            <Trash2 size={17} />
+          </Link>
         </header>
 
         <div className="mb-3 grid grid-cols-3 gap-1.5 sm:mb-4 sm:gap-2">

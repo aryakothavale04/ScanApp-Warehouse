@@ -95,13 +95,31 @@ function hasSuspiciousInvoiceItems(items = []) {
   });
 }
 
+export async function purgeExpiredTrashedOrders() {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const expiredOrders = await Order.find({ trashedAt: { $lte: cutoff } }).select("_id").lean();
+  if (!expiredOrders.length) return { deletedCount: 0 };
+
+  const expiredOrderIds = expiredOrders.map((order) => order._id);
+  await PackingLog.deleteMany({ orderId: { $in: expiredOrderIds } });
+  const result = await Order.deleteMany({ _id: { $in: expiredOrderIds } });
+  return { deletedCount: result.deletedCount || 0 };
+}
+
 export async function listOrders(req, res) {
-  const orders = await populateOrder(Order.find({}).sort({ createdAt: -1 }));
+  await purgeExpiredTrashedOrders();
+  const orders = await populateOrder(Order.find({ trashedAt: { $exists: false } }).sort({ createdAt: -1 }));
+  res.json({ orders });
+}
+
+export async function listTrashedOrders(req, res) {
+  await purgeExpiredTrashedOrders();
+  const orders = await populateOrder(Order.find({ trashedAt: { $exists: true } }).sort({ trashedAt: -1 }));
   res.json({ orders });
 }
 
 export async function getOrder(req, res) {
-  const order = await populateOrder(Order.findById(req.params.id));
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -109,17 +127,41 @@ export async function getOrder(req, res) {
 }
 
 export async function deleteOrder(req, res) {
-  const order = await Order.findByIdAndDelete(req.params.id);
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
 
+  order.trashedAt = new Date();
+  await order.save();
+  res.json({ success: true, trashedOrderId: order._id, message: "Order moved to trash" });
+}
+
+export async function restoreOrder(req, res) {
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: true } });
+  if (!order) {
+    return res.status(404).json({ message: "Trash order not found" });
+  }
+
+  order.trashedAt = undefined;
+  await order.save();
+
+  const populated = await populateOrder(Order.findById(order._id));
+  res.json({ message: "Order restored", order: populated });
+}
+
+export async function permanentlyDeleteOrder(req, res) {
+  const order = await Order.findOneAndDelete({ _id: req.params.id, trashedAt: { $exists: true } });
+  if (!order) {
+    return res.status(404).json({ message: "Trash order not found" });
+  }
+
   await PackingLog.deleteMany({ orderId: order._id });
-  res.json({ success: true, deletedOrderId: order._id });
+  res.json({ success: true, deletedOrderId: order._id, message: "Order permanently deleted" });
 }
 
 export async function updateOrder(req, res) {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -137,7 +179,7 @@ export async function updateOrder(req, res) {
 }
 
 export async function addOrderItem(req, res) {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -171,7 +213,7 @@ export async function addOrderItem(req, res) {
 }
 
 export async function updateOrderItem(req, res) {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -205,7 +247,7 @@ export async function updateOrderItem(req, res) {
 }
 
 export async function manuallyPackOrderItem(req, res) {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -242,7 +284,7 @@ export async function manuallyPackOrderItem(req, res) {
 }
 
 export async function manuallyPackFullOrderItem(req, res) {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -277,7 +319,7 @@ export async function manuallyPackFullOrderItem(req, res) {
 }
 
 export async function manuallyCompleteOrder(req, res) {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -311,7 +353,7 @@ export async function manuallyCompleteOrder(req, res) {
 }
 
 export async function removePackedOrderItem(req, res) {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -343,7 +385,7 @@ export async function removePackedOrderItem(req, res) {
 }
 
 export async function removeOnePackedOrderItem(req, res) {
-  const order = await Order.findById(req.params.id);
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -427,7 +469,7 @@ export async function scanBarcode(req, res) {
       return res.status(400).json({ message: "Barcode is required" });
     }
 
-    const order = await Order.findById(req.params.id).populate("items.productId", "productName barcode aliases category");
+    const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }).populate("items.productId", "productName barcode aliases category");
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }

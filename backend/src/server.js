@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import { createApp } from "./app.js";
 import { connectDb } from "./config/db.js";
+import { purgeExpiredTrashedOrders } from "./controllers/orderController.js";
 
 dotenv.config();
 
@@ -25,6 +26,20 @@ const startServer = async () => {
     app.listen(port, () => {
       console.log(`Server running on port ${port}`);
     });
+
+    const runTrashCleanup = async () => {
+      try {
+        const result = await purgeExpiredTrashedOrders();
+        if (result.deletedCount) {
+          console.log(`Trash cleanup permanently deleted ${result.deletedCount} orders`);
+        }
+      } catch (error) {
+        console.error("Trash cleanup failed:", error);
+      }
+    };
+
+    runTrashCleanup();
+    setInterval(runTrashCleanup, 60 * 60 * 1000);
 
   } catch (error) {
     console.error("SERVER ERROR:");
