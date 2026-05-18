@@ -319,10 +319,11 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                       <button
                         onClick={() => removePacked(index)}
                         disabled={busyAction === `remove-${index}`}
-                        className="flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
+                        className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 bg-white text-red-700 disabled:opacity-60"
+                        aria-label={`Reset packed quantity for ${item.productName || "product"}`}
+                        title="Reset packed"
                       >
                         <X size={16} />
-                        Reset packed
                       </button>
                     )}
                   </div>
