@@ -280,15 +280,6 @@ export default function PackingScreen({ orderId }) {
                 {order.customerName} - Invoice {order.invoiceNo}
               </p>
               <button
-                type="button"
-                onClick={() => setAddItemOpen(true)}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-leaf text-white shadow-sm"
-                aria-label="Add product manually"
-                title="Add product manually"
-              >
-                <Plus size={16} />
-              </button>
-              <button
                 onClick={() => setScannerActive(false)}
                 className="flex min-h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-bold text-white"
               >
@@ -324,12 +315,8 @@ export default function PackingScreen({ orderId }) {
               </div>
               {checklist}
             </div>
-            <section className="grid gap-3 rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a] sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <ProgressRing packed={progress.packedQuantity} total={progress.totalQuantity} />
-              </div>
-              {partyButton}
-              {addItemButton}
+            <section className="rounded-lg bg-white p-4 shadow-sm dark:bg-[#151f1a]">
+              <ProgressRing packed={progress.packedQuantity} total={progress.totalQuantity} />
             </section>
           </div>
         ) : (
