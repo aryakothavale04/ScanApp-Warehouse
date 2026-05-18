@@ -1,6 +1,22 @@
 import axios from "axios";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
+export const ACCESS_CODE_STORAGE_KEY = "scanapp_access_code";
+
+export function getStoredAccessCode() {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(ACCESS_CODE_STORAGE_KEY) || "";
+}
+
+export function setStoredAccessCode(code) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(ACCESS_CODE_STORAGE_KEY, code);
+}
+
+export function clearStoredAccessCode() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(ACCESS_CODE_STORAGE_KEY);
+}
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -10,10 +26,25 @@ const apiClient = axios.create({
   }
 });
 
+apiClient.interceptors.request.use((config) => {
+  const code = getStoredAccessCode();
+  if (code) {
+    config.headers = config.headers || {};
+    config.headers["x-access-code"] = code;
+  }
+  return config;
+});
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const message = error.response?.data?.message || error.message || "Backend is unavailable. Please try again shortly.";
+    if (error.response?.status === 401) {
+      clearStoredAccessCode();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("scanapp-auth-required"));
+      }
+    }
     return Promise.reject(new Error(message));
   }
 );

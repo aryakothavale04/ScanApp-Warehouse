@@ -1,4 +1,5 @@
 import "./globals.css";
+import AccessCodeGate from "@/components/AccessCodeGate";
 import BackendStatusGate from "@/components/BackendStatusGate";
 
 export const metadata = {
@@ -24,7 +25,9 @@ export default function RootLayout({ children }) {
   return (
     <html lang="mr">
       <body>
-        <BackendStatusGate>{children}</BackendStatusGate>
+        <BackendStatusGate>
+          <AccessCodeGate>{children}</AccessCodeGate>
+        </BackendStatusGate>
       </body>
     </html>
   );

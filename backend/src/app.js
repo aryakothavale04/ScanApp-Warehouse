@@ -4,6 +4,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import orderRoutes from "./routes/orderRoutes.js";
 import productRoutes from "./routes/productRoutes.js";
+import { requireAccessCode } from "./middleware/accessCodeAuth.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 
 const DEFAULT_FRONTEND_ORIGIN = "https://scan-app-warehouse.vercel.app";
@@ -18,7 +19,7 @@ export function createApp() {
   app.use(helmet());
   const corsOptions = {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-access-code"],
     origin(origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
@@ -40,8 +41,8 @@ export function createApp() {
     res.json({ success: true });
   });
 
-  app.use("/api/orders", orderRoutes);
-  app.use("/api/products", productRoutes);
+  app.use("/api/orders", requireAccessCode, orderRoutes);
+  app.use("/api/products", requireAccessCode, productRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
