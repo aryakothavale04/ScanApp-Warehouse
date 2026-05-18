@@ -161,6 +161,15 @@ export default function PackingScreen({ orderId }) {
   }, [orderId]);
 
   const handleManualCompleteOrder = useCallback(async () => {
+    const pendingQuantity = Math.max((progress.totalQuantity || 0) - (progress.packedQuantity || 0), 0);
+    const confirmMessage = [
+      `Mark invoice ${order?.invoiceNo || ""} as complete manually?`,
+      pendingQuantity > 0 ? `${pendingQuantity} quantity still appears pending and will be marked as packed.` : "This order will be saved as packed.",
+      "Continue only if packing is physically complete."
+    ].join("\n\n");
+
+    if (!window.confirm(confirmMessage)) return;
+
     setCompletingOrder(true);
     try {
       const data = await api.manuallyCompleteOrder(orderId);
@@ -174,7 +183,7 @@ export default function PackingScreen({ orderId }) {
     } finally {
       setCompletingOrder(false);
     }
-  }, [orderId]);
+  }, [order?.invoiceNo, orderId, progress.packedQuantity, progress.totalQuantity]);
 
   const handleSavePartyName = useCallback(async () => {
     setSavingParty(true);
