@@ -127,6 +127,8 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
           const isEditing = editingIndex === index;
           const canManualPack = !done;
           const canRemoveOnePacked = (item.packedQuantity || 0) > 0;
+          const actionButtonSize = scanningMode ? "h-7 w-7 sm:h-8 sm:w-8" : "h-9 w-9";
+          const actionIconSize = scanningMode ? 14 : 16;
 
           return (
             <article
@@ -179,42 +181,6 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                   <div className={`grid place-items-center rounded-full ${scanningMode ? "h-7 w-7 sm:h-8 sm:w-8" : "h-8 w-8 sm:h-10 sm:w-10"} ${done ? "bg-emerald-600 text-white" : "bg-black/5 text-black/40 dark:bg-white/10 dark:text-white/50"}`}>
                     {done ? <Check size={scanningMode ? 16 : 20} /> : <PackageX size={scanningMode ? 15 : 18} />}
                   </div>
-                  {scanningMode && canManualPack && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => manualPack(index)}
-                        disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
-                        className="grid h-7 w-7 place-items-center rounded-full bg-leaf text-white shadow-sm disabled:opacity-60 sm:h-8 sm:w-8"
-                        aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
-                        title="Only 1 qty packed"
-                      >
-                        <Plus size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => manualPackFull(index)}
-                        disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
-                        className="grid h-7 w-7 place-items-center rounded-full bg-emerald-600 text-white shadow-sm disabled:opacity-60 sm:h-8 sm:w-8"
-                        aria-label={`Mark full quantity packed for ${item.productName || "product"}`}
-                        title="Full qty packed"
-                      >
-                        <CheckCheck size={14} />
-                      </button>
-                    </>
-                  )}
-                  {scanningMode && canRemoveOnePacked && (
-                    <button
-                      type="button"
-                      onClick={() => removeOnePacked(index)}
-                      disabled={busyAction === `remove-one-${index}`}
-                      className="grid h-7 w-7 place-items-center rounded-full border border-red-200 bg-white text-red-700 shadow-sm disabled:opacity-60 sm:h-8 sm:w-8"
-                      aria-label={`Remove one packed quantity from ${item.productName || "product"}`}
-                      title="Unpack 1 qty"
-                    >
-                      <Minus size={14} />
-                    </button>
-                  )}
                 </div>
               </div>
 
@@ -270,8 +236,9 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                   </div>
                 </div>
 
-                {!scanningMode && (isEditing || canManualPack || done) && (
-                  <div className="mb-2 flex flex-wrap gap-1.5 sm:mb-3 sm:gap-2">
+                {(isEditing || onManualPack || onRemoveOnePacked || onManualPackFull || onRemovePacked) && (
+                  <div className={`${scanningMode ? "mb-1.5" : "mb-2 sm:mb-3"} flex items-center justify-between gap-2`}>
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
                     {isEditing && (
                       <button
                         onClick={() => saveItem(index)}
@@ -282,50 +249,50 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                         Save item
                       </button>
                     )}
-                    {canManualPack && (
-                      <>
-                        <button
-                          onClick={() => manualPackFull(index)}
-                          disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
-                          className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-600 text-white disabled:opacity-60"
-                          aria-label={`Mark full quantity packed for ${item.productName || "product"}`}
-                          title="Full qty packed"
-                        >
-                          <CheckCheck size={16} />
-                        </button>
-                        <button
-                          onClick={() => manualPack(index)}
-                          disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
-                          className="grid h-9 w-9 place-items-center rounded-lg bg-leaf text-white disabled:opacity-60"
-                          aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
-                          title="Only 1 qty packed"
-                        >
-                          <Plus size={16} />
-                        </button>
-                      </>
-                    )}
-                    {canRemoveOnePacked && (
                       <button
+                        type="button"
                         onClick={() => removeOnePacked(index)}
-                        disabled={busyAction === `remove-one-${index}`}
-                        className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 bg-white text-red-700 disabled:opacity-60"
+                        disabled={!canRemoveOnePacked || busyAction === `remove-one-${index}`}
+                        className={`grid ${actionButtonSize} place-items-center rounded-lg border border-red-200 bg-white text-red-700 shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
                         aria-label={`Remove one packed quantity from ${item.productName || "product"}`}
                         title="Unpack 1 qty"
                       >
-                        <Minus size={16} />
+                        <Minus size={actionIconSize} />
                       </button>
-                    )}
-                    {done && (
                       <button
+                        type="button"
+                        onClick={() => manualPack(index)}
+                        disabled={!canManualPack || busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
+                        className={`grid ${actionButtonSize} place-items-center rounded-lg bg-leaf text-white shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
+                        aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
+                        title="Only 1 qty packed"
+                      >
+                        <Plus size={actionIconSize} />
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
+                      <button
+                        type="button"
+                        onClick={() => manualPackFull(index)}
+                        disabled={!canManualPack || busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
+                        className={`grid ${actionButtonSize} place-items-center rounded-lg bg-emerald-600 text-white shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
+                        aria-label={`Mark full quantity packed for ${item.productName || "product"}`}
+                        title="Full qty packed"
+                      >
+                        <CheckCheck size={actionIconSize} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => removePacked(index)}
-                        disabled={busyAction === `remove-${index}`}
-                        className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 bg-white text-red-700 disabled:opacity-60"
+                        disabled={!canRemoveOnePacked || busyAction === `remove-${index}`}
+                        className={`grid ${actionButtonSize} place-items-center rounded-lg border border-red-200 bg-white text-red-700 shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
                         aria-label={`Reset packed quantity for ${item.productName || "product"}`}
                         title="Reset packed"
                       >
-                        <X size={16} />
+                        <X size={actionIconSize} />
                       </button>
-                    )}
+                    </div>
                   </div>
                 )}
 
