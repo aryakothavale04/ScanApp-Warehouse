@@ -287,18 +287,20 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                         <button
                           onClick={() => manualPackFull(index)}
                           disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
-                          className="flex min-h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
+                          className="grid h-9 w-9 place-items-center rounded-lg bg-emerald-600 text-white disabled:opacity-60"
+                          aria-label={`Mark full quantity packed for ${item.productName || "product"}`}
+                          title="Full qty packed"
                         >
                           <CheckCheck size={16} />
-                          Full qty packed
                         </button>
                         <button
                           onClick={() => manualPack(index)}
                           disabled={busyAction === `pack-${index}` || busyAction === `pack-full-${index}`}
-                          className="flex min-h-9 items-center gap-1.5 rounded-lg bg-leaf px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
+                          className="grid h-9 w-9 place-items-center rounded-lg bg-leaf text-white disabled:opacity-60"
+                          aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
+                          title="Only 1 qty packed"
                         >
                           <Plus size={16} />
-                          Only 1 qty packed
                         </button>
                       </>
                     )}
@@ -306,10 +308,11 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
                       <button
                         onClick={() => removeOnePacked(index)}
                         disabled={busyAction === `remove-one-${index}`}
-                        className="flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-bold text-red-700 disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
+                        className="grid h-9 w-9 place-items-center rounded-lg border border-red-200 bg-white text-red-700 disabled:opacity-60"
+                        aria-label={`Remove one packed quantity from ${item.productName || "product"}`}
+                        title="Unpack 1 qty"
                       >
                         <Minus size={16} />
-                        Unpack 1 qty
                       </button>
                     )}
                     {done && (
