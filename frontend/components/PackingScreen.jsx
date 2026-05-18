@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Loader2, Play, Plus, Save, Square, UserRound, X } from "lucide-react";
+import { ArrowLeft, Barcode, Camera, CheckCircle2, Loader2, Plus, Save, Square, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/src/lib/api";
 import BarcodeScanner from "./BarcodeScanner";
@@ -69,6 +69,7 @@ export default function PackingScreen({ orderId }) {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
   const [scannerActive, setScannerActive] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
   const [toast, setToast] = useState(null);
   const [lastPackedItemId, setLastPackedItemId] = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
@@ -277,13 +278,14 @@ export default function PackingScreen({ orderId }) {
   const scannerButton = (
     <button
       onClick={() => {
-        if (!scannerActive) armScanAudio();
-        setScannerActive((value) => !value);
+        armScanAudio();
+        setScannerActive(true);
+        setCameraActive(false);
       }}
-      className={`flex min-h-10 w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-white sm:min-h-12 sm:px-4 sm:py-3 sm:text-base ${scannerActive ? "bg-red-600" : "bg-leaf"}`}
+      className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white sm:min-h-12 sm:px-4 sm:py-3 sm:text-base"
     >
-      {scannerActive ? <Square size={18} /> : <Play size={18} />}
-      {scannerActive ? "Stop Scanner" : "Start Scanner"}
+      <Barcode size={18} />
+      Start Barcode Scanner
     </button>
   );
   const partyButton = (
@@ -309,9 +311,9 @@ export default function PackingScreen({ orderId }) {
       Add Item
     </button>
   );
-  const scanner = scannerActive ? (
+  const scanner = scannerActive && cameraActive ? (
     <BarcodeScanner
-      active={scannerActive}
+      active={scannerActive && cameraActive}
       compact
       onScan={handleScan}
       onError={(message) => {
@@ -348,7 +350,22 @@ export default function PackingScreen({ orderId }) {
                 {order.customerName} - Invoice {order.invoiceNo}
               </p>
               <button
-                onClick={() => setScannerActive(false)}
+                type="button"
+                onClick={() => {
+                  armScanAudio();
+                  setCameraActive((value) => !value);
+                }}
+                className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white shadow-sm sm:h-9 sm:w-9 ${cameraActive ? "bg-amber-600" : "bg-leaf"}`}
+                aria-label={cameraActive ? "Stop camera scanner" : "Start camera scanner"}
+                title={cameraActive ? "Stop camera" : "Start camera"}
+              >
+                {cameraActive ? <Square size={15} /> : <Camera size={15} />}
+              </button>
+              <button
+                onClick={() => {
+                  setScannerActive(false);
+                  setCameraActive(false);
+                }}
                 className="flex min-h-8 shrink-0 items-center justify-center gap-1 rounded-lg bg-red-600 px-2.5 py-1 text-xs font-bold text-white sm:min-h-9 sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-sm"
               >
                 <Square size={15} />
@@ -377,10 +394,12 @@ export default function PackingScreen({ orderId }) {
 
         {scannerActive ? (
           <div className="space-y-2">
-            <div className="grid gap-2 lg:grid-cols-[240px_1fr] lg:items-start">
-              <div className="mx-auto w-full max-w-[220px] sm:max-w-[260px] lg:sticky lg:top-3">
-                {scanner}
-              </div>
+            <div className={cameraActive ? "grid gap-2 lg:grid-cols-[240px_1fr] lg:items-start" : "grid gap-2"}>
+              {cameraActive && (
+                <div className="mx-auto w-full max-w-[220px] sm:max-w-[260px] lg:sticky lg:top-3">
+                  {scanner}
+                </div>
+              )}
               {checklist}
             </div>
             <section className="rounded-lg bg-white p-2.5 shadow-sm dark:bg-[#151f1a] sm:p-4">
