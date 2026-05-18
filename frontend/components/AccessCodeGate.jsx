@@ -76,7 +76,7 @@ export default function AccessCodeGate({ children }) {
           inputMode="numeric"
           autoFocus
           className="w-full rounded-lg border border-black/10 bg-white px-3 py-3 text-center text-xl font-black tracking-[0.3em] outline-none focus:border-leaf dark:bg-[#101712]"
-          placeholder="0000"
+          placeholder="Code"
         />
         {error && <p className="mt-2 text-center text-xs font-bold text-red-700 dark:text-red-300">{error}</p>}
         <button
