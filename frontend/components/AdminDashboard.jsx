@@ -116,7 +116,7 @@ export default function AdminDashboard() {
           })}
         </div>
 
-        <div className="grid gap-3 lg:grid-cols-[320px_1fr] lg:gap-4">
+        <div className="grid gap-3 lg:gap-4">
           <div>
             <UploadInvoice onUploaded={loadOrders} onToast={setToast} />
           </div>
