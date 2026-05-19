@@ -79,6 +79,10 @@ export const api = {
     data: {}
   }),
   permanentlyDeleteOrder: (id) => request(`/api/orders/${id}/permanent`, "delete"),
+  restoreOrderItem: (orderId, itemIndex) => request(`/api/orders/${orderId}/trash/items/${itemIndex}/restore`, "post", {
+    data: {}
+  }),
+  permanentlyDeleteOrderItem: (orderId, itemIndex) => request(`/api/orders/${orderId}/trash/items/${itemIndex}/permanent`, "delete"),
   emptyTrash: () => request("/api/orders/trash/empty", "delete"),
   uploadInvoice: (file) => {
     const formData = new FormData();

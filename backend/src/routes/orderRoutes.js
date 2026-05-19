@@ -11,9 +11,11 @@ import {
   manuallyPackFullOrderItem,
   manuallyPackOrderItem,
   permanentlyDeleteOrder,
+  permanentlyDeleteOrderItem,
   removeOnePackedOrderItem,
   removePackedOrderItem,
   restoreOrder,
+  restoreOrderItem,
   scanBarcode,
   updateOrder,
   updateOrderItem,
@@ -39,6 +41,8 @@ router.patch("/:id", asyncHandler(updateOrder));
 router.delete("/:id", asyncHandler(deleteOrder));
 router.post("/:id/restore", asyncHandler(restoreOrder));
 router.delete("/:id/permanent", asyncHandler(permanentlyDeleteOrder));
+router.post("/:id/trash/items/:itemIndex/restore", asyncHandler(restoreOrderItem));
+router.delete("/:id/trash/items/:itemIndex/permanent", asyncHandler(permanentlyDeleteOrderItem));
 router.post("/:id/scan", asyncHandler(scanBarcode));
 router.post("/:id/manual-complete", asyncHandler(manuallyCompleteOrder));
 router.post("/:id/items", asyncHandler(addOrderItem));

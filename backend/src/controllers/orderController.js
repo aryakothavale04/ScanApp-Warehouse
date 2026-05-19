@@ -133,6 +133,13 @@ function getOrderItemByIndex(order, itemIndex) {
   return activeItems[index];
 }
 
+function getTrashedOrderItemByOriginalIndex(order, itemIndex) {
+  const index = Number.parseInt(itemIndex, 10);
+  if (!Number.isInteger(index) || index < 0 || index >= order.items.length) return null;
+  const item = order.items[index];
+  return isItemTrashed(item) ? item : null;
+}
+
 function hasSuspiciousInvoiceItems(items = []) {
   if (!items.length) return true;
 
@@ -232,6 +239,45 @@ export async function permanentlyDeleteOrder(req, res) {
 
   await PackingLog.deleteMany({ orderId: order._id });
   res.json({ success: true, deletedOrderId: order._id, message: "Order permanently deleted" });
+}
+
+export async function restoreOrderItem(req, res) {
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const item = getTrashedOrderItemByOriginalIndex(order, req.params.itemIndex);
+  if (!item) {
+    return res.status(404).json({ message: "Trash product not found" });
+  }
+
+  item.trashedAt = undefined;
+  order.recalculateStatus();
+  await order.save();
+
+  const populated = await populateOrder(Order.findById(order._id));
+  res.json({ message: `${item.productName || "Product"} restored`, order: serializeOrder(populated) });
+}
+
+export async function permanentlyDeleteOrderItem(req, res) {
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const index = Number.parseInt(req.params.itemIndex, 10);
+  const item = getTrashedOrderItemByOriginalIndex(order, index);
+  if (!item) {
+    return res.status(404).json({ message: "Trash product not found" });
+  }
+
+  const itemName = item.productName || "Product";
+  order.items.splice(index, 1);
+  order.recalculateStatus();
+  await order.save();
+
+  res.json({ success: true, message: `${itemName} permanently deleted` });
 }
 
 export async function emptyTrash(req, res) {
