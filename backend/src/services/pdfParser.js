@@ -153,6 +153,14 @@ function cleanProductName(value = "") {
     .trim();
 }
 
+function cleanEnglishProductName(value = "") {
+  const cleaned = cleanProductName(value);
+  return cleaned
+    .replace(/\s+(?:1|5)$/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function isLikelyHeaderLine(line = "") {
   const normalized = line.toString().toLowerCase();
   const compact = normalized.replace(/[^a-z#]/g, "");
@@ -208,7 +216,7 @@ function logMalformedRow(row) {
 }
 
 function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, invoiceLine) {
-  const safeName = cleanProductName(productName);
+  const safeName = cleanEnglishProductName(productName);
   const safePrice = Number.isFinite(pricePerUnit) ? pricePerUnit : 0;
   const safeTotal = Number.isFinite(totalAmount) ? totalAmount : 0;
 
@@ -365,7 +373,7 @@ function extractVyaparAmounts(row) {
 }
 
 function extractQuantityFromName(name) {
-  const packMatch = name.match(/(?:Rs\s*)?\d+(?:\.\d+)?\s*x\s*(\d+(?:\.\d+)?)/i);
+  const packMatch = name.match(/(?:^|\s)(?:Rs\s*)?\d+(?:\.\d+)?\s+x\s+(\d+(?:\.\d+)?)(?:\s|$)/i);
   return packMatch ? toNumber(packMatch[1]) : null;
 }
 
@@ -456,7 +464,14 @@ function isolateMultilingualName(rawName = "", inferredQuantity) {
     }
   }
 
-  const englishTokens = bestStart >= 0 ? bodyTokens.slice(bestStart, bestEnd) : [];
+  let englishTokens = bestStart >= 0 ? bodyTokens.slice(bestStart, bestEnd) : [];
+  if (
+    englishTokens.length &&
+    bodyTokens.some(hasNativeScript) &&
+    englishTokens.every((token) => /^[\d.,/-]*(?:x|pic|pcs?|\u00d7)[\d.,/-]*(?:pic|pcs?)?$/i.test(token))
+  ) {
+    englishTokens = [];
+  }
   const nativeTokens = bodyTokens.filter((token, index) => (
     hasNativeScript(token) ||
     (bestStart >= 0 && index < bestStart && !hasLatin(token))
@@ -468,6 +483,22 @@ function isolateMultilingualName(rawName = "", inferredQuantity) {
     productName: (englishTokens.length ? englishTokens : bodyTokens).join(" ").trim(),
     quantity
   };
+}
+
+function splitSerialPrefix(line, expectedSerial) {
+  const exactSerial = line.match(/^(\d{1,3})$/);
+  if (exactSerial) {
+    return { serialNo: Number.parseInt(exactSerial[1], 10), rest: "" };
+  }
+
+  if (Number.isInteger(expectedSerial) && expectedSerial > 0) {
+    const expectedText = expectedSerial.toString();
+    if (line.startsWith(expectedText) && line.length > expectedText.length) {
+      return { serialNo: expectedSerial, rest: line.slice(expectedText.length).trim() };
+    }
+  }
+
+  return null;
 }
 
 function parseVyaparRow(row) {
@@ -544,19 +575,33 @@ function parseVyaparRow(row) {
 function parseSeparatedVyaparRows(lines) {
   const section = getItemSectionLines(lines);
   const rows = [];
+  const rowGroups = [];
+  let current = null;
+  let expectedSerial = null;
 
-  for (let index = 0; index < section.length; index += 1) {
-    if (!/^\d{1,3}$/.test(section[index])) continue;
+  for (const line of section) {
+    if (/^invoice$/i.test(line) || isItemTableHeaderLine(line)) continue;
 
-    const firstDetailLine = section[index + 1];
-    const secondDetailLine = section[index + 2];
-    if (!firstDetailLine || !secondDetailLine) continue;
+    const serialPrefix = splitSerialPrefix(line, expectedSerial);
+    if (serialPrefix) {
+      if (current?.parts.length) rowGroups.push(current);
+      current = { serialNo: serialPrefix.serialNo, parts: [] };
+      expectedSerial = serialPrefix.serialNo + 1;
+      if (serialPrefix.rest) current.parts.push(serialPrefix.rest);
+      continue;
+    }
 
-    const row = `${firstDetailLine} ${secondDetailLine}`;
+    if (current) current.parts.push(line);
+  }
+
+  if (current?.parts.length) rowGroups.push(current);
+
+  for (const group of rowGroups) {
+    const row = group.parts.join(" ");
     const parsed = parseVyaparRow(row);
     if (parsed) {
+      parsed.serialNo = group.serialNo;
       rows.push(parsed);
-      index += 2;
     }
   }
 
@@ -737,7 +782,7 @@ export async function parseVyaparInvoice(buffer) {
 
     const items = extractItems(lines).map((item, index) => ({
       ...item,
-      serialNo: index + 1
+      serialNo: item.serialNo || index + 1
     }));
 
     if (!items.length) {

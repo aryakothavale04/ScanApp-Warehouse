@@ -112,4 +112,37 @@ describe("pdf parser", () => {
       ]
     );
   });
+
+  it("keeps multi-line item details and glued serial rows in order", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "16",
+      "\u0938\u094b\u092c\u0940\u0938\u094d\u0915\u094b \u091a\u0949\u0915\u094b\u0932\u0947\u091f 5/-",
+      "Sobisco Cream Chocolate",
+      "31.8g",
+      "1 Rs 52 Rs 52",
+      "17",
+      "\u0932\u094b\u0915\u0932 cake Rs 5x12pic",
+      "89023517777801 Rs 52 Rs 52",
+      "18Fair And Lovely1 Rs 115 Rs 115",
+      "1913x161 Rs 70 Rs 70",
+      "Total4 Rs 289"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        hsnOrBarcode: item.hsnOrBarcode,
+        quantity: item.quantity,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 16, productName: "Sobisco Cream Chocolate 31.8g", hsnOrBarcode: "", quantity: 1, totalAmount: 52 },
+        { serialNo: 17, productName: "cake 5x12pic", hsnOrBarcode: "8902351777780", quantity: 1, totalAmount: 52 },
+        { serialNo: 18, productName: "Fair And Lovely", hsnOrBarcode: "", quantity: 1, totalAmount: 115 },
+        { serialNo: 19, productName: "13x16", hsnOrBarcode: "", quantity: 1, totalAmount: 70 }
+      ]
+    );
+  });
 });
