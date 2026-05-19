@@ -443,7 +443,7 @@ function isolateMultilingualName(rawName = "", inferredQuantity) {
   const tokens = working.split(/\s+/).filter(Boolean);
   let itemCode = "";
   let bodyTokens = tokens;
-  if (tokens.length > 1 && /^[A-Za-z0-9/-]{1,8}$/.test(tokens[0]) && tokens.slice(1).some(hasNativeScript)) {
+  if (tokens.length > 1 && /^[A-Za-z][A-Za-z0-9/-]{0,7}$/.test(tokens[0]) && tokens.slice(1).some(hasNativeScript)) {
     itemCode = tokens[0];
     bodyTokens = tokens.slice(1);
   }

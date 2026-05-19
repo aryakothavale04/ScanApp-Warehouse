@@ -74,6 +74,16 @@ describe("pdf parser", () => {
     assert.equal(item.quantity, 1);
   });
 
+  it("does not treat pack price markers as item codes", () => {
+    const fiveRupeeItem = parseVyaparRow("Rs 5 लेस Lays Classic Salted2 Rs 52 Rs 104");
+    const slashPriceItem = parseVyaparRow("2/- शेव सामोसा Shev Samosa1 Rs 52 Rs 52");
+
+    assert.equal(fiveRupeeItem.itemCode, "");
+    assert.equal(fiveRupeeItem.hsnOrBarcode, "");
+    assert.equal(slashPriceItem.itemCode, "");
+    assert.equal(slashPriceItem.hsnOrBarcode, "");
+  });
+
   it("parses tab-separated positional columns without merging the amount fields into the name", () => {
     const item = parseVyaparRow("SA जाम पाट 5 Jam Party4\t4\t5\t20");
 
