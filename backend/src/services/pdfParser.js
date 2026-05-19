@@ -702,6 +702,17 @@ function parseStrictAmountDetail(line = "") {
     };
   }
 
+  const trailingDecimalQuantityMatch = beforePrice.match(/(\d+\.\d+)$/);
+  if (trailingDecimalQuantityMatch) {
+    return {
+      barcode: "",
+      quantity: toNumber(trailingDecimalQuantityMatch[1]),
+      pricePerUnit,
+      totalAmount,
+      codeColumnText: beforePrice.slice(0, trailingDecimalQuantityMatch.index).trim()
+    };
+  }
+
   const compactCurrencyQuantity = beforePrice.match(/(?:₹|Rs|INR)\s*(\d{2,8})$/i);
   if (compactCurrencyQuantity) {
     const split = chooseQuantitySplit(compactCurrencyQuantity[1]);

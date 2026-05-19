@@ -243,6 +243,29 @@ describe("pdf parser", () => {
     );
   });
 
+  it("preserves decimal quantities from the quantity column", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "5",
+      "750ml \u0925\u092e\u094d\u0938 \u0905\u092a Rs 35",
+      "Thums Up 600 ml0.5 Rs 780 Rs 390",
+      "Total0.5 Rs 390"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 5, productName: "750ml थम्स अप ₹35", quantity: 0.5, pricePerUnit: 780, totalAmount: 390 }
+      ]
+    );
+  });
+
   it("keeps multi-line item details and glued serial rows in order", () => {
     const items = extractItems([
       "#Item nameItem codeQuantityPrice/ unitAmount",
