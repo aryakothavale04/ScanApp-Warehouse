@@ -10,100 +10,6 @@ import StoreBrand from "./StoreBrand";
 import Toast from "./Toast";
 
 let scanAudioContext;
-const SYNC_FAILED_MESSAGE = "Sync failed. Please retry.";
-const SCAN_DEDUPE_WINDOW_MS = 350;
-
-function toNumber(value, fallback = 0) {
-  const number = Number.parseFloat(value);
-  return Number.isFinite(number) ? number : fallback;
-}
-
-function normalizeLookupValue(value) {
-  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]/g, "");
-}
-
-function getItemIdentity(item = {}) {
-  return item.productId?._id || item.productId || item.hsnOrBarcode || item.productName || item.serialNo;
-}
-
-function getItemLookupValues(item = {}) {
-  return [
-    item.hsnOrBarcode,
-    item.itemCode,
-    item.barcode,
-    item.productId?.barcode,
-    item.productId?._id,
-    item.productId,
-    item.productName,
-    item.itemName
-  ].map(normalizeLookupValue).filter(Boolean);
-}
-
-function cloneOrder(order) {
-  if (!order) return null;
-  return {
-    ...order,
-    items: (order.items || []).map((item) => ({ ...item }))
-  };
-}
-
-function recalculateOrder(order) {
-  if (!order) return order;
-  const items = order.items || [];
-  const packedQuantity = items.reduce((sum, item) => sum + toNumber(item.packedQuantity), 0);
-  const totalQuantity = items.reduce((sum, item) => sum + toNumber(item.quantity), 0);
-  const completed = items.length > 0 && items.every((item) => toNumber(item.packedQuantity) >= toNumber(item.quantity));
-
-  return {
-    ...order,
-    packedStatus: completed ? "Completed" : "Pending",
-    progress: {
-      ...(order.progress || {}),
-      packedQuantity,
-      totalQuantity
-    }
-  };
-}
-
-function updatePackedQuantity(order, itemIndex, updater) {
-  const draft = cloneOrder(order);
-  const item = draft?.items?.[itemIndex];
-  if (!item) return draft;
-
-  const quantity = Math.max(toNumber(item.quantity), 0);
-  const currentPacked = Math.max(toNumber(item.packedQuantity), 0);
-  item.packedQuantity = Math.min(quantity, Math.max(0, updater(currentPacked, quantity)));
-  return recalculateOrder(draft);
-}
-
-function findScanItemIndex(order, barcode) {
-  const normalizedBarcode = normalizeLookupValue(barcode);
-  if (!normalizedBarcode) return -1;
-
-  return (order?.items || []).findIndex((item) => {
-    const values = getItemLookupValues(item);
-    return values.some((value) => value === normalizedBarcode);
-  });
-}
-
-function buildOptimisticItem(itemDraft, order) {
-  const quantity = Math.max(toNumber(itemDraft.quantity, 1), 0);
-  const pricePerUnit = Math.max(toNumber(itemDraft.pricePerUnit), 0);
-  const serialNo = (order?.items || []).reduce((max, item, index) => {
-    const serial = Number.parseInt(item.serialNo, 10);
-    return Math.max(max, Number.isFinite(serial) ? serial : index + 1);
-  }, 0) + 1;
-
-  return {
-    serialNo,
-    productName: itemDraft.productName || "",
-    hsnOrBarcode: itemDraft.hsnOrBarcode || "",
-    quantity,
-    pricePerUnit,
-    totalAmount: quantity * pricePerUnit,
-    packedQuantity: 0
-  };
-}
 
 function getScanAudioContext() {
   if (typeof window === "undefined") return null;
@@ -172,51 +78,15 @@ export default function PackingScreen({ orderId }) {
   const [addingItem, setAddingItem] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [partyNameOpen, setPartyNameOpen] = useState(false);
-  const orderRef = useRef(null);
-  const pendingSyncCountRef = useRef(0);
+  const scanLoadingRef = useRef(false);
   const hardwareScanBufferRef = useRef("");
   const hardwareScanTimerRef = useRef(null);
-  const lastScanRef = useRef({ value: "", at: 0 });
   const lastWrongScanRef = useRef({ value: "", at: 0 });
 
   const replaceOrder = useCallback((nextOrder) => {
-    orderRef.current = nextOrder || null;
     setOrder(nextOrder || null);
     if (nextOrder) setPartyName(nextOrder.customerName || "");
   }, []);
-
-  const applyOptimisticOrder = useCallback((updater) => {
-    const previousOrder = orderRef.current;
-    const nextOrder = recalculateOrder(updater(previousOrder));
-    orderRef.current = nextOrder;
-    setOrder(nextOrder);
-    return previousOrder;
-  }, []);
-
-  const beginBackgroundSync = useCallback(() => {
-    pendingSyncCountRef.current += 1;
-    setScanLoading(true);
-  }, []);
-
-  const finishBackgroundSync = useCallback(() => {
-    pendingSyncCountRef.current = Math.max(0, pendingSyncCountRef.current - 1);
-    setScanLoading(pendingSyncCountRef.current > 0);
-  }, []);
-
-  const syncInBackground = useCallback((requestPromise, previousOrder, options = {}) => {
-    beginBackgroundSync();
-    Promise.resolve(requestPromise)
-      .then((data) => {
-        if (data?.order) replaceOrder(data.order);
-        options.onSuccess?.(data);
-      })
-      .catch((error) => {
-        if (previousOrder) replaceOrder(previousOrder);
-        options.onError?.(error);
-        setToast({ type: "error", message: SYNC_FAILED_MESSAGE });
-      })
-      .finally(finishBackgroundSync);
-  }, [beginBackgroundSync, finishBackgroundSync, replaceOrder]);
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
@@ -239,54 +109,35 @@ export default function PackingScreen({ orderId }) {
     return order.progress;
   }, [order]);
 
-  const handleScan = useCallback((barcode) => {
-    const scannedValue = barcode?.toString() || "";
-    const now = Date.now();
-    if (lastScanRef.current.value === scannedValue && now - lastScanRef.current.at < SCAN_DEDUPE_WINDOW_MS) return;
-    lastScanRef.current = { value: scannedValue, at: now };
-
-    const previousOrder = orderRef.current;
-    const itemIndex = findScanItemIndex(previousOrder, barcode);
-    let optimisticOrder = previousOrder;
-
-    if (itemIndex >= 0) {
-      optimisticOrder = updatePackedQuantity(previousOrder, itemIndex, (currentPacked) => currentPacked + 1);
-      replaceOrder(optimisticOrder);
-      const packedItem = optimisticOrder?.items?.[itemIndex];
-      const completedQuantity = toNumber(packedItem?.packedQuantity) >= toNumber(packedItem?.quantity);
-      setLastPackedItemId(getItemIdentity(packedItem));
-      setToast({ type: "success", message: completedQuantity ? "Qty completed" : "Item packed" });
+  const handleScan = useCallback(async (barcode) => {
+    if (scanLoadingRef.current) return;
+    scanLoadingRef.current = true;
+    setScanLoading(true);
+    try {
+      const data = await api.scan(orderId, barcode);
+      replaceOrder(data.order);
+      setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
+      setToast({ type: "success", message: data.message || "Item packed" });
+      const completedQuantity = data.message === "Qty completed" || data.message === "Order completed";
       playScanSound(completedQuantity ? "complete" : "correct");
       window.navigator.vibrate?.(70);
       setTimeout(() => setLastPackedItemId(null), 900);
-    }
+    } catch (error) {
+      const now = Date.now();
+      const scannedValue = barcode?.toString() || "";
+      const isRepeatWrongScan = lastWrongScanRef.current.value === scannedValue && now - lastWrongScanRef.current.at < 2500;
+      lastWrongScanRef.current = { value: scannedValue, at: now };
 
-    syncInBackground(api.scan(orderId, barcode), previousOrder, {
-      onSuccess: (data) => {
-        const packedItemId = data?.packedItem?.productId || data?.packedItem?.hsnOrBarcode;
-        if (packedItemId) {
-          setLastPackedItemId(packedItemId);
-          setTimeout(() => setLastPackedItemId(null), 900);
-        }
-        if (itemIndex < 0) {
-          setToast({ type: "success", message: data?.message || "Item packed" });
-          const completedQuantity = data?.message === "Qty completed" || data?.message === "Order completed";
-          playScanSound(completedQuantity ? "complete" : "correct");
-          window.navigator.vibrate?.(70);
-        }
-      },
-      onError: () => {
-        if (itemIndex >= 0) return;
-        const retryAt = Date.now();
-        const isRepeatWrongScan = lastWrongScanRef.current.value === scannedValue && retryAt - lastWrongScanRef.current.at < 2500;
-        lastWrongScanRef.current = { value: scannedValue, at: retryAt };
-        if (!isRepeatWrongScan) {
-          playScanSound("wrong");
-          window.navigator.vibrate?.([80, 40, 80]);
-        }
+      setToast({ type: "error", message: error.message });
+      if (!isRepeatWrongScan) {
+        playScanSound("wrong");
+        window.navigator.vibrate?.([80, 40, 80]);
       }
-    });
-  }, [orderId, replaceOrder, syncInBackground]);
+    } finally {
+      scanLoadingRef.current = false;
+      setScanLoading(false);
+    }
+  }, [orderId, replaceOrder]);
 
   useEffect(() => {
     if (!scannerActive) return undefined;
@@ -334,100 +185,73 @@ export default function PackingScreen({ orderId }) {
     };
   }, [handleScan, scannerActive]);
 
-  const handleUpdateItem = useCallback((itemIndex, item) => {
-    const previousOrder = applyOptimisticOrder((currentOrder) => {
-      const draft = cloneOrder(currentOrder);
-      if (draft?.items?.[itemIndex]) {
-        const quantity = Math.max(toNumber(item.quantity, 1), 0);
-        const pricePerUnit = Math.max(toNumber(item.pricePerUnit), 0);
-        draft.items[itemIndex] = {
-          ...draft.items[itemIndex],
-          ...item,
-          quantity,
-          pricePerUnit,
-          totalAmount: toNumber(item.totalAmount, quantity * pricePerUnit),
-          packedQuantity: Math.min(toNumber(draft.items[itemIndex].packedQuantity), quantity)
-        };
-      }
-      return draft;
-    });
-    setToast({ type: "success", message: "Item updated" });
-    syncInBackground(api.updateOrderItem(orderId, itemIndex, item), previousOrder);
-  }, [applyOptimisticOrder, orderId, syncInBackground]);
+  const handleUpdateItem = useCallback(async (itemIndex, item) => {
+    const data = await api.updateOrderItem(orderId, itemIndex, item);
+    replaceOrder(data.order);
+    setToast({ type: "success", message: data.message || "Item updated" });
+  }, [orderId, replaceOrder]);
 
-  const handleManualPackItem = useCallback((itemIndex) => {
-    const previousOrder = orderRef.current;
-    const optimisticOrder = updatePackedQuantity(previousOrder, itemIndex, (currentPacked) => currentPacked + 1);
-    replaceOrder(optimisticOrder);
-    const packedItem = optimisticOrder?.items?.[itemIndex];
-    setLastPackedItemId(getItemIdentity(packedItem));
-    setToast({ type: "success", message: "Item packed" });
+  const handleManualPackItem = useCallback(async (itemIndex) => {
+    const data = await api.manualPackOrderItem(orderId, itemIndex);
+    replaceOrder(data.order);
+    setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
+    setToast({ type: "success", message: data.message || "Item packed" });
     playScanSound("correct");
     window.navigator.vibrate?.(70);
     setTimeout(() => setLastPackedItemId(null), 900);
-    syncInBackground(api.manualPackOrderItem(orderId, itemIndex), previousOrder);
-  }, [orderId, replaceOrder, syncInBackground]);
+  }, [orderId, replaceOrder]);
 
-  const handleManualPackFullItem = useCallback((itemIndex) => {
-    const previousOrder = orderRef.current;
-    const optimisticOrder = updatePackedQuantity(previousOrder, itemIndex, (_currentPacked, quantity) => quantity);
-    replaceOrder(optimisticOrder);
-    const packedItem = optimisticOrder?.items?.[itemIndex];
-    setLastPackedItemId(getItemIdentity(packedItem));
-    setToast({ type: "success", message: "Full quantity packed" });
+  const handleManualPackFullItem = useCallback(async (itemIndex) => {
+    const data = await api.manualPackFullOrderItem(orderId, itemIndex);
+    replaceOrder(data.order);
+    setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
+    setToast({ type: "success", message: data.message || "Full quantity packed" });
     playScanSound("complete");
     window.navigator.vibrate?.([70, 40, 70]);
     setTimeout(() => setLastPackedItemId(null), 900);
-    syncInBackground(api.manualPackFullOrderItem(orderId, itemIndex), previousOrder);
-  }, [orderId, replaceOrder, syncInBackground]);
+  }, [orderId, replaceOrder]);
 
-  const handleRemovePackedItem = useCallback((itemIndex) => {
-    const previousOrder = orderRef.current;
-    const optimisticOrder = updatePackedQuantity(previousOrder, itemIndex, () => 0);
-    replaceOrder(optimisticOrder);
-    setToast({ type: "success", message: "Packed item removed" });
-    syncInBackground(api.removePackedOrderItem(orderId, itemIndex), previousOrder);
-  }, [orderId, replaceOrder, syncInBackground]);
+  const handleRemovePackedItem = useCallback(async (itemIndex) => {
+    const data = await api.removePackedOrderItem(orderId, itemIndex);
+    replaceOrder(data.order);
+    setToast({ type: "success", message: data.message || "Packed item removed" });
+  }, [orderId, replaceOrder]);
 
-  const handleRemoveOnePackedItem = useCallback((itemIndex) => {
-    const previousOrder = orderRef.current;
-    const optimisticOrder = updatePackedQuantity(previousOrder, itemIndex, (currentPacked) => currentPacked - 1);
-    replaceOrder(optimisticOrder);
-    setToast({ type: "success", message: "1 packed quantity removed" });
-    syncInBackground(api.removeOnePackedOrderItem(orderId, itemIndex), previousOrder);
-  }, [orderId, replaceOrder, syncInBackground]);
+  const handleRemoveOnePackedItem = useCallback(async (itemIndex) => {
+    const data = await api.removeOnePackedOrderItem(orderId, itemIndex);
+    replaceOrder(data.order);
+    setToast({ type: "success", message: data.message || "1 packed quantity removed" });
+  }, [orderId, replaceOrder]);
 
-  const handleSavePartyName = useCallback(() => {
-    const previousOrder = applyOptimisticOrder((currentOrder) => ({ ...currentOrder, customerName: partyName }));
+  const handleSavePartyName = useCallback(async () => {
     setSavingParty(true);
-    setPartyNameOpen(false);
-    setToast({ type: "success", message: "Party name updated" });
-    syncInBackground(api.updateOrder(orderId, { customerName: partyName }), previousOrder, {
-      onError: () => setPartyName(previousOrder?.customerName || ""),
-      onSuccess: () => setSavingParty(false)
-    });
-    window.setTimeout(() => setSavingParty(false), 0);
-  }, [applyOptimisticOrder, orderId, partyName, syncInBackground]);
+    try {
+      const data = await api.updateOrder(orderId, { customerName: partyName });
+      replaceOrder(data.order);
+      setPartyNameOpen(false);
+      setToast({ type: "success", message: data.message || "Party name updated" });
+    } catch (error) {
+      setToast({ type: "error", message: error.message });
+    } finally {
+      setSavingParty(false);
+    }
+  }, [orderId, partyName, replaceOrder]);
 
-  const handleAddItem = useCallback((event) => {
+  const handleAddItem = useCallback(async (event) => {
     event.preventDefault();
-    const previousOrder = applyOptimisticOrder((currentOrder) => {
-      const draft = cloneOrder(currentOrder);
-      return {
-        ...draft,
-        items: [...(draft?.items || []), buildOptimisticItem(itemDraft, draft)]
-      };
-    });
     setAddingItem(true);
-    setItemDraft({ productName: "", hsnOrBarcode: "", quantity: 1, pricePerUnit: "" });
-    setAddItemOpen(false);
-    setToast({ type: "success", message: "Item added" });
-    syncInBackground(api.addOrderItem(orderId, itemDraft), previousOrder, {
-      onSuccess: () => setAddingItem(false),
-      onError: () => setAddingItem(false)
-    });
-    window.setTimeout(() => setAddingItem(false), 0);
-  }, [applyOptimisticOrder, itemDraft, orderId, syncInBackground]);
+    try {
+      const data = await api.addOrderItem(orderId, itemDraft);
+      replaceOrder(data.order);
+      setItemDraft({ productName: "", hsnOrBarcode: "", quantity: 1, pricePerUnit: "" });
+      setAddItemOpen(false);
+      setToast({ type: "success", message: data.message || "Item added" });
+    } catch (error) {
+      setToast({ type: "error", message: error.message });
+    } finally {
+      setAddingItem(false);
+    }
+  }, [itemDraft, orderId, replaceOrder]);
 
   if (loading) {
     return (
@@ -598,7 +422,7 @@ export default function PackingScreen({ orderId }) {
             <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
               <div>
                 <h2 className="text-base font-black sm:text-lg">Add Item</h2>
-                <p className="text-xs text-black/55 dark:text-white/55">This item will appear in the checklist immediately.</p>
+                <p className="text-xs text-black/55 dark:text-white/55">This item will be saved to the checklist.</p>
               </div>
               <button
                 type="button"
@@ -683,7 +507,7 @@ export default function PackingScreen({ orderId }) {
             <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
               <div>
                 <h2 className="text-base font-black sm:text-lg">Change Party Name</h2>
-                <p className="text-xs text-black/55 dark:text-white/55">This change will be saved to the order immediately.</p>
+                <p className="text-xs text-black/55 dark:text-white/55">This change will be saved to the order.</p>
               </div>
               <button
                 type="button"

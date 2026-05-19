@@ -2,7 +2,7 @@
 
 import { Boxes, CheckCircle2, TimerReset, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api, clearStoredAccessCode } from "@/src/lib/api";
 import OrderCard from "./OrderCard";
 import StoreBrand from "./StoreBrand";
@@ -29,20 +29,17 @@ export default function AdminDashboard() {
     }
   }
 
-  const deleteOrder = useCallback((orderToDelete) => {
-    const previousOrders = orders;
-    const previousTrash = trashedOrders;
-
-    setOrders((currentOrders) => currentOrders.filter((order) => order._id !== orderToDelete._id));
-    setTrashedOrders((currentTrash) => [{ ...orderToDelete, deletedAt: new Date().toISOString() }, ...currentTrash]);
-    setToast({ type: "success", message: "Order moved to trash" });
-
-    api.deleteOrder(orderToDelete._id).catch(() => {
-      setOrders(previousOrders);
-      setTrashedOrders(previousTrash);
-      setToast({ type: "error", message: "Sync failed. Please retry." });
-    });
-  }, [orders, trashedOrders]);
+  async function deleteOrder(orderToDelete) {
+    try {
+      await api.deleteOrder(orderToDelete._id);
+      setOrders((currentOrders) => currentOrders.filter((order) => order._id !== orderToDelete._id));
+      setTrashedOrders((currentTrash) => [{ ...orderToDelete, trashedAt: new Date().toISOString() }, ...currentTrash]);
+      setToast({ type: "success", message: "Order moved to trash" });
+    } catch (error) {
+      setToast({ type: "error", message: error.message });
+      throw error;
+    }
+  }
 
   function logout() {
     clearStoredAccessCode();
