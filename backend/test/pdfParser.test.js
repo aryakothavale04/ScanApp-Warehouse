@@ -195,6 +195,31 @@ describe("pdf parser", () => {
     );
   });
 
+  it("extracts a compact first row before the expected serial is initialized", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "1Sobisco Choco Fill 30/-890235111112630 Rs 25 Rs 750",
+      "2",
+      "\u0938\u094b\u092c\u0940\u0938\u094d\u0915\u094b \u092e\u093f\u0932\u094d\u0915 5/-",
+      "89023519988716 Rs 52 Rs 312",
+      "Total36 Rs 1062"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        hsnOrBarcode: item.hsnOrBarcode,
+        quantity: item.quantity,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 1, productName: "Sobisco Choco Fill 30/-", hsnOrBarcode: "8902351111126", quantity: 30, totalAmount: 750 },
+        { serialNo: 2, productName: "सोबीस्को मिल्क 5/-", hsnOrBarcode: "8902351998871", quantity: 6, totalAmount: 312 }
+      ]
+    );
+  });
+
   it("keeps barcode detail with the current serial when barcode starts with the next serial", () => {
     const items = extractItems([
       "#Item nameItem codeQuantityPrice/ unitAmount",

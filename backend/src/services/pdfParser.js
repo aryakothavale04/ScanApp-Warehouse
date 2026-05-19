@@ -573,6 +573,13 @@ function splitSerialPrefix(line, expectedSerial) {
     }
   }
 
+  if (!Number.isInteger(expectedSerial)) {
+    const firstCompact = line.match(/^1(?![\d\s])(.+)$/);
+    if (firstCompact) {
+      return { serialNo: 1, rest: firstCompact[1].trim() };
+    }
+  }
+
   return null;
 }
 
