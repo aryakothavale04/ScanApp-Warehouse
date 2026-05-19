@@ -195,6 +195,54 @@ describe("pdf parser", () => {
     );
   });
 
+  it("keeps barcode detail with the current serial when barcode starts with the next serial", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "7",
+      "\u0938\u094b\u092c\u0940\u0938\u094d\u0915\u094b \u0915\u0947\u0915 \u092b\u094d\u0930\u0941\u091f \u092e\u0941\u092b\u093f\u0928 Rs 5x12pic",
+      "89023513331842 Rs 52 Rs 104",
+      "8",
+      "\u0938\u094b\u092c\u0940\u0938\u094d\u0915\u094b \u0915\u0947\u0915 \u092e\u0901\u0917\u094b \u092e\u0901\u0917\u094b Rs 5x12pic",
+      "89023517777733 Rs 52 Rs 156",
+      "Total5 Rs 260"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        hsnOrBarcode: item.hsnOrBarcode,
+        quantity: item.quantity,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 7, hsnOrBarcode: "8902351333184", quantity: 2, totalAmount: 104 },
+        { serialNo: 8, hsnOrBarcode: "8902351777773", quantity: 3, totalAmount: 156 }
+      ]
+    );
+  });
+
+  it("splits compact pack price, barcode, and quantity from one detail line", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "3",
+      "Sobisco Milky Toast 130g Rs 20890235122230312 Rs 18 Rs 216",
+      "Total12 Rs 216"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        hsnOrBarcode: item.hsnOrBarcode,
+        quantity: item.quantity,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 3, productName: "Sobisco Milky Toast 130g ₹20", hsnOrBarcode: "8902351222303", quantity: 12, totalAmount: 216 }
+      ]
+    );
+  });
+
   it("keeps multi-line item details and glued serial rows in order", () => {
     const items = extractItems([
       "#Item nameItem codeQuantityPrice/ unitAmount",

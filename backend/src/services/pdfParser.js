@@ -129,9 +129,9 @@ function findSignedAmountAfterLabel(lines, labels, options) {
 }
 
 function extractSummaryFields(lines) {
-  const paymentTypeIndex = lines.findIndex((line) => /\bpayment\s*type\b/i.test(line));
+  const paymentTypeIndex = lines.findIndex((line) => /\bpayment\s*(?:type|mode)\b/i.test(line));
   const paymentType = paymentTypeIndex >= 0
-    ? lines[paymentTypeIndex].replace(/.*payment\s*type\s*[:\-]?/i, "").trim() || lines[paymentTypeIndex + 1]?.trim() || ""
+    ? lines[paymentTypeIndex].replace(/.*payment\s*(?:type|mode)\s*[:\-]?/i, "").trim() || lines[paymentTypeIndex + 1]?.trim() || ""
     : "";
 
   return {
@@ -655,6 +655,39 @@ function parseStrictAmountDetail(line = "") {
       .sort((left, right) => left.difference - right.difference || right.quantity - left.quantity)[0] || null;
   };
 
+  const compactPackBarcodeQuantity = beforePrice.match(/(?:₹|Rs|INR)\s*(\d{2,21})$/i);
+  if (compactPackBarcodeQuantity) {
+    const compactDigits = compactPackBarcodeQuantity[1];
+    const candidates = [];
+    for (let packLength = 1; packLength <= Math.min(3, compactDigits.length - 6); packLength += 1) {
+      const packPrice = compactDigits.slice(0, packLength);
+      const packPriceValue = toNumber(packPrice);
+      if (!Number.isFinite(packPriceValue) || packPriceValue <= 0 || packPriceValue > 100) continue;
+
+      const barcodeQuantity = compactDigits.slice(packLength);
+      const split = chooseQuantitySplit(barcodeQuantity);
+      if (split?.prefixDigits && isValidBarcode(split.prefixDigits)) {
+        candidates.push({ packPrice, barcode: split.prefixDigits, quantity: split.quantity });
+      }
+    }
+
+    const selected = candidates.sort((left, right) => {
+      const leftLeadingZero = left.barcode.startsWith("0") ? 1 : 0;
+      const rightLeadingZero = right.barcode.startsWith("0") ? 1 : 0;
+      return leftLeadingZero - rightLeadingZero || right.barcode.length - left.barcode.length || right.packPrice.length - left.packPrice.length;
+    })[0];
+
+    if (selected) {
+      return {
+        barcode: selected.barcode,
+        quantity: selected.quantity,
+        pricePerUnit,
+        totalAmount,
+        codeColumnText: `${beforePrice.slice(0, compactPackBarcodeQuantity.index)}₹${selected.packPrice}`.trim()
+      };
+    }
+  }
+
   const barcodeQuantityMatch = beforePrice.match(/(\d{6,18})$/);
   if (barcodeQuantityMatch) {
     const split = chooseQuantitySplit(barcodeQuantityMatch[1]);
@@ -836,6 +869,12 @@ function parseSeparatedVyaparRows(lines) {
 
   for (const line of section) {
     if (/^invoice$/i.test(line) || isItemTableHeaderLine(line)) continue;
+
+    const currentHasDetail = current?.parts?.some((part) => parseStrictAmountDetail(part));
+    if (current && !currentHasDetail && parseStrictAmountDetail(line)) {
+      current.parts.push(line);
+      continue;
+    }
 
     const serialPrefix = splitSerialPrefix(line, expectedSerial);
     if (serialPrefix) {
