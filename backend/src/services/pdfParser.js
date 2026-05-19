@@ -2,6 +2,7 @@ import pdfParse from "pdf-parse/lib/pdf-parse.js";
 
 function normalizePdfText(text = "") {
   return text
+    .normalize("NFKC")
     .replace(/\u0000/g, "")
     .replace(/\u00a0/g, " ")
     .replace(/\u20b9|â‚¹/g, " Rs ")
@@ -13,14 +14,80 @@ function normalizePdfText(text = "") {
 function cleanLines(text) {
   return normalizePdfText(text || "")
     .split(/\r?\n/)
-    .map((line) => line.replace(/\s+/g, " ").trim())
+    .map((line) => line.replace(/[^\S\t]+/g, " ").replace(/\t+/g, "\t").trim())
     .filter(Boolean);
 }
 
+function renderPageWithColumns(pageData) {
+  return pageData.getTextContent({
+    normalizeWhitespace: false,
+    disableCombineTextItems: true
+  }).then((textContent) => {
+    const rows = [];
+    const yTolerance = 3;
+
+    for (const item of textContent.items || []) {
+      const text = normalizePdfText(item.str || "").trim();
+      if (!text) continue;
+
+      const [, , , , x, y] = item.transform || [];
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+
+      let row = rows.find((candidate) => Math.abs(candidate.y - y) <= yTolerance);
+      if (!row) {
+        row = { y, items: [] };
+        rows.push(row);
+      }
+
+      row.items.push({
+        text,
+        x,
+        width: Number.isFinite(item.width) ? item.width : text.length * 5
+      });
+    }
+
+    return rows
+      .sort((a, b) => b.y - a.y)
+      .map((row) => {
+        const parts = row.items.sort((a, b) => a.x - b.x);
+        let line = "";
+        let previousRight = null;
+
+        for (const part of parts) {
+          if (!line) {
+            line = part.text;
+          } else {
+            const gap = previousRight === null ? 0 : part.x - previousRight;
+            line += gap > 12 ? `\t${part.text}` : ` ${part.text}`;
+          }
+
+          previousRight = Math.max(previousRight ?? -Infinity, part.x + part.width);
+        }
+
+        return line.replace(/[^\S\t]+/g, " ").replace(/\t+/g, "\t").trim();
+      })
+      .filter(Boolean)
+      .join("\n");
+  });
+}
+
 function extractInvoiceNo(lines) {
-  const invoiceLine = lines.find((line) => /invoice\s*(no|number|#)?\s*\.?\s*[:\-]/i.test(line));
-  const match = invoiceLine?.match(/invoice\s*(?:no|number|#)?\s*\.?\s*[:\-]?\s*([A-Z0-9\-\/]+)/i);
+  const invoiceLine = lines.find((line) => /invoice\s*(no|number|#)\s*\.?\s*[:\-#]/i.test(line)) ||
+    lines.find((line) => /invoice\s*(?:no|number|#)?\s*\.?\s*[:\-#]/i.test(line));
+  const match = invoiceLine?.match(/invoice\s*(?:no|number|#)?\s*\.?\s*[:\-#]?\s*([A-Z0-9\-\/]+)/i);
   return match?.[1] || `VYP-${Date.now()}`;
+}
+
+function extractDate(lines) {
+  const dateLine = lines.find((line) => /\b(invoice\s*)?date\b/i.test(line));
+  const match = dateLine?.match(/\b(\d{1,2}[-\/.]\d{1,2}[-\/.]\d{2,4})\b/);
+  return match?.[1]?.replace(/[/.]/g, "-") || "";
+}
+
+function extractContact(lines) {
+  const contactLine = lines.find((line) => /\b(phone|mobile|contact|tel)\b/i.test(line));
+  const match = contactLine?.match(/(?:\+?\d[\d\s-]{7,}\d)/);
+  return match?.[0]?.replace(/\s+/g, "-") || "";
 }
 
 function extractCustomerName(lines) {
@@ -35,7 +102,34 @@ function extractCustomerName(lines) {
 }
 
 function toNumber(value) {
-  return Number.parseFloat(value?.toString().replace(/,/g, "") || "0");
+  return Number.parseFloat(value?.toString().replace(/,/g, "").replace(/(?<=\d)\s+(?=\d)/g, "") || "0");
+}
+
+function findAmountAfterLabel(lines, labels, { reverse = true } = {}) {
+  const labelPattern = new RegExp(`\\b(?:${labels.join("|")})\\b`, "i");
+  const searchLines = reverse ? [...lines].reverse() : lines;
+  const line = searchLines.find((entry) => labelPattern.test(entry));
+  if (!line) return null;
+
+  const matches = [...line.matchAll(/[\d,]+(?:\.\d+)?/g)];
+  return matches.length ? toNumber(matches.at(-1)[0]) : null;
+}
+
+function extractSummaryFields(lines) {
+  const paymentTypeIndex = lines.findIndex((line) => /\bpayment\s*type\b/i.test(line));
+  const paymentType = paymentTypeIndex >= 0
+    ? lines[paymentTypeIndex].replace(/.*payment\s*type\s*[:\-]?/i, "").trim() || lines[paymentTypeIndex + 1]?.trim() || ""
+    : "";
+
+  return {
+    subtotal: findAmountAfterLabel(lines, ["sub\\s*total", "subtotal"]),
+    total: findAmountAfterLabel(lines, ["grand\\s*total", "total"]),
+    balance: findAmountAfterLabel(lines, ["^balance", "balance\\s*due"], { reverse: false }),
+    previousBalance: findAmountAfterLabel(lines, ["previous\\s*balance"]),
+    currentBalance: findAmountAfterLabel(lines, ["current\\s*balance"]),
+    paymentType,
+    paidAmount: findAmountAfterLabel(lines, ["paid", "received", "payment"])
+  };
 }
 
 function normalizeNameKey(value = "") {
@@ -50,6 +144,7 @@ function normalizeNameKey(value = "") {
 function cleanProductName(value = "") {
   return value
     .toString()
+    .normalize("NFKC")
     .replace(/^#?\s*\d{1,3}\s+/, "")
     .replace(/\b(item\s*name|product\s*name|description|hsn\/?sac|hsn|barcode|qty|quantity|rate|price|amount|total)\b/gi, " ")
     .replace(/\b(rs|inr)\b/gi, " ")
@@ -60,11 +155,26 @@ function cleanProductName(value = "") {
 
 function isLikelyHeaderLine(line = "") {
   const normalized = line.toString().toLowerCase();
+  const compact = normalized.replace(/[^a-z#]/g, "");
   return (
     /^#/.test(normalized) ||
+    compact.includes("itemnameitemcodequantitypriceunitamount") ||
     /\b(item\s*name|product\s*name|description)\b/.test(normalized) ||
     /\b(hsn|barcode)\b.*\b(qty|quantity)\b/.test(normalized) ||
     /\b(qty|quantity)\b.*\b(rate|price)\b.*\b(amount|total)\b/.test(normalized)
+  );
+}
+
+function isItemTableHeaderLine(line = "") {
+  const normalized = line.toString().toLowerCase();
+  const compact = normalized.replace(/[^a-z]/g, "");
+  return (
+    /^#\s*item\s*name/i.test(line) ||
+    compact.includes("itemnameitemcodequantitypriceunitamount") ||
+    (
+      /\b(item\s*name|product\s*name|description)\b/i.test(normalized) &&
+      /\b(qty|quantity|rate|price|amount|total)\b/i.test(normalized)
+    )
   );
 }
 
@@ -109,9 +219,13 @@ function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmoun
   if (!Number.isFinite(calculatedQuantity) || calculatedQuantity <= 0 || calculatedQuantity > 100000) return null;
 
   return {
+    itemName: safeName,
+    itemCode: normalizeBarcodeField(hsnOrBarcode, calculatedQuantity, hasExplicitQuantity),
     productName: safeName,
     hsnOrBarcode: normalizeBarcodeField(hsnOrBarcode, calculatedQuantity, hasExplicitQuantity),
     quantity: Number(calculatedQuantity.toFixed(3)),
+    unitPrice: safePrice,
+    amount: safeTotal,
     pricePerUnit: safePrice,
     totalAmount: safeTotal,
     invoiceLine: invoiceLine?.toString() || safeName
@@ -159,8 +273,7 @@ function parseAmountTail(line) {
 
 function getItemSectionLines(lines) {
   const startIndex = lines.findIndex((line) => (
-    /^#\s*item\s*name/i.test(line) ||
-    (/\b(item\s*name|product\s*name|description)\b/i.test(line) && /\b(qty|quantity|rate|amount|total)\b/i.test(line))
+    isItemTableHeaderLine(line)
   ));
   const stopPattern = /invoice amount in words|payment type|amounts|sub total|taxable amount|total tax|cgst|sgst|igst|round off|grand total|total|balance|bank details/i;
   if (startIndex < 0) return [];
@@ -213,6 +326,21 @@ function chunkVyaparRows(lines) {
 }
 
 function extractVyaparAmounts(row) {
+  const columns = row.split("\t").map((part) => part.trim()).filter(Boolean);
+  if (columns.length >= 4) {
+    const amount = toNumber(columns.at(-1));
+    const unitPrice = toNumber(columns.at(-2));
+    const quantity = toNumber(columns.at(-3));
+    if (unitPrice > 0 && amount > 0 && quantity > 0) {
+      return {
+        pricePerUnit: unitPrice,
+        totalAmount: amount,
+        explicitQuantity: quantity,
+        beforeAmounts: columns.slice(0, -3).join(" ").trim()
+      };
+    }
+  }
+
   const currencyNumbers = [...row.matchAll(/(?:Rs|INR)\s*([\d,]+(?:\.\d+)?)/gi)];
   if (currencyNumbers.length >= 2) {
     const priceMatch = currencyNumbers.at(-2);
@@ -261,6 +389,87 @@ function splitTrailingInferredQuantity(name, inferredQuantity) {
   return productName ? { productName, quantity: roundedInferredQuantity } : null;
 }
 
+function splitAttachedInferredQuantity(name, inferredQuantity) {
+  const roundedInferredQuantity = Math.round(inferredQuantity);
+  if (
+    !Number.isFinite(inferredQuantity) ||
+    !Number.isFinite(roundedInferredQuantity) ||
+    Math.abs(inferredQuantity - roundedInferredQuantity) > 0.001
+  ) {
+    return null;
+  }
+
+  const inferredText = roundedInferredQuantity.toString();
+  const match = name.match(/(\d+)$/);
+  if (!match || !match[1].endsWith(inferredText)) return null;
+
+  const keptDigits = match[1].slice(0, -inferredText.length);
+  const productName = `${name.slice(0, match.index)}${keptDigits}`.trim();
+  return productName ? { productName, quantity: roundedInferredQuantity } : null;
+}
+
+function hasLatin(value = "") {
+  return /[A-Za-z]/.test(value);
+}
+
+function hasNativeScript(value = "") {
+  return /[^\u0000-\u007F]/.test(value);
+}
+
+function isolateMultilingualName(rawName = "", inferredQuantity) {
+  let working = cleanProductName(rawName);
+  let quantity = null;
+
+  const attachedQuantity = splitAttachedInferredQuantity(working, inferredQuantity);
+  if (attachedQuantity) {
+    working = attachedQuantity.productName;
+    quantity = attachedQuantity.quantity;
+  } else {
+    const spacedQuantity = splitTrailingInferredQuantity(working, inferredQuantity);
+    if (spacedQuantity) {
+      working = spacedQuantity.productName;
+      quantity = spacedQuantity.quantity;
+    }
+  }
+
+  const tokens = working.split(/\s+/).filter(Boolean);
+  let itemCode = "";
+  let bodyTokens = tokens;
+  if (tokens.length > 1 && /^[A-Za-z0-9/-]{1,8}$/.test(tokens[0]) && tokens.slice(1).some(hasNativeScript)) {
+    itemCode = tokens[0];
+    bodyTokens = tokens.slice(1);
+  }
+
+  let bestStart = -1;
+  let bestEnd = -1;
+  for (let index = 0; index < bodyTokens.length; index += 1) {
+    if (!hasLatin(bodyTokens[index])) continue;
+
+    let end = index + 1;
+    while (end < bodyTokens.length && !hasNativeScript(bodyTokens[end])) {
+      end += 1;
+    }
+
+    if (end - index >= bestEnd - bestStart) {
+      bestStart = index;
+      bestEnd = end;
+    }
+  }
+
+  const englishTokens = bestStart >= 0 ? bodyTokens.slice(bestStart, bestEnd) : [];
+  const nativeTokens = bodyTokens.filter((token, index) => (
+    hasNativeScript(token) ||
+    (bestStart >= 0 && index < bestStart && !hasLatin(token))
+  ));
+
+  return {
+    itemCode,
+    nativeName: nativeTokens.join(" ").trim(),
+    productName: (englishTokens.length ? englishTokens : bodyTokens).join(" ").trim(),
+    quantity
+  };
+}
+
 function parseVyaparRow(row) {
   if (!row || isLikelyHeaderLine(row)) return null;
 
@@ -274,8 +483,11 @@ function parseVyaparRow(row) {
   const explicitPackQuantity = extractQuantityFromName(amounts.beforeAmounts);
 
   let hsnOrBarcode = "";
-  let quantity = Number.isFinite(explicitPackQuantity) && explicitPackQuantity > 0 ? explicitPackQuantity : null;
+  let quantity = Number.isFinite(amounts.explicitQuantity) && amounts.explicitQuantity > 0
+    ? amounts.explicitQuantity
+    : Number.isFinite(explicitPackQuantity) && explicitPackQuantity > 0 ? explicitPackQuantity : null;
   let productName = amounts.beforeAmounts;
+  let nativeName = "";
 
   if (spacedBarcodeQuantityMatch) {
     hsnOrBarcode = spacedBarcodeQuantityMatch[1];
@@ -311,7 +523,13 @@ function parseVyaparRow(row) {
     }
   }
 
-  return buildItem(
+  const multilingualName = isolateMultilingualName(productName, inferredQuantity);
+  productName = multilingualName.productName;
+  nativeName = multilingualName.nativeName;
+  quantity = quantity ?? multilingualName.quantity;
+  hsnOrBarcode = hsnOrBarcode || multilingualName.itemCode;
+
+  const item = buildItem(
     productName,
     hsnOrBarcode,
     quantity,
@@ -319,9 +537,36 @@ function parseVyaparRow(row) {
     amounts.totalAmount,
     row
   );
+  if (item && nativeName) item.nativeName = nativeName;
+  return item;
+}
+
+function parseSeparatedVyaparRows(lines) {
+  const section = getItemSectionLines(lines);
+  const rows = [];
+
+  for (let index = 0; index < section.length; index += 1) {
+    if (!/^\d{1,3}$/.test(section[index])) continue;
+
+    const firstDetailLine = section[index + 1];
+    const secondDetailLine = section[index + 2];
+    if (!firstDetailLine || !secondDetailLine) continue;
+
+    const row = `${firstDetailLine} ${secondDetailLine}`;
+    const parsed = parseVyaparRow(row);
+    if (parsed) {
+      rows.push(parsed);
+      index += 2;
+    }
+  }
+
+  return rows;
 }
 
 function extractVyaparItems(lines) {
+  const separatedRows = parseSeparatedVyaparRows(lines);
+  if (separatedRows.length) return separatedRows;
+
   return chunkVyaparRows(lines)
     .map(parseVyaparRow)
     .filter(Boolean);
@@ -499,10 +744,22 @@ export async function parseVyaparInvoice(buffer) {
       throw Object.assign(new Error("No invoice items found. Please check the Vyapar PDF format."), { statusCode: 422 });
     }
 
+    const summary = extractSummaryFields(lines);
+    const itemsTotal = Number(items.reduce((sum, item) => sum + (item.totalAmount || 0), 0).toFixed(2));
+
     return {
       invoiceNo: extractInvoiceNo(lines),
+      date: extractDate(lines),
       customerName: extractCustomerName(lines),
+      contact: extractContact(lines),
       items,
+      subtotal: summary.subtotal ?? itemsTotal,
+      total: summary.total ?? summary.subtotal ?? itemsTotal,
+      balance: summary.balance ?? 0,
+      previousBalance: summary.previousBalance,
+      currentBalance: summary.currentBalance,
+      paymentType: summary.paymentType,
+      paidAmount: summary.paidAmount,
       rawText: parsed?.text || ""
     };
   } catch (error) {
@@ -515,5 +772,7 @@ export async function parseVyaparInvoice(buffer) {
 export const pdfParserInternals = {
   parseVyaparRow,
   parseAmountTail,
-  splitTrailingInferredQuantity
+  splitTrailingInferredQuantity,
+  isolateMultilingualName,
+  renderPageWithColumns
 };

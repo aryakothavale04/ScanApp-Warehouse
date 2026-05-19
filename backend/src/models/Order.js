@@ -4,9 +4,14 @@ const orderItemSchema = new mongoose.Schema(
   {
     productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product" },
     serialNo: { type: Number, min: 1 },
+    itemCode: { type: String, trim: true },
+    itemName: { type: String, trim: true },
+    nativeName: { type: String, trim: true },
     productName: { type: String, required: true, trim: true },
     hsnOrBarcode: { type: String, trim: true },
     quantity: { type: Number, required: true, min: 0.001 },
+    unitPrice: { type: Number, min: 0 },
+    amount: { type: Number, min: 0 },
     pricePerUnit: { type: Number, min: 0 },
     totalAmount: { type: Number, min: 0 },
     packedQuantity: { type: Number, default: 0, min: 0 },
@@ -18,7 +23,16 @@ const orderItemSchema = new mongoose.Schema(
 const orderSchema = new mongoose.Schema(
   {
     invoiceNo: { type: String, required: true, unique: true, trim: true, index: true },
+    date: { type: String, trim: true },
     customerName: { type: String, required: true, trim: true },
+    contact: { type: String, trim: true },
+    subtotal: { type: Number, min: 0 },
+    total: { type: Number, min: 0 },
+    balance: { type: Number, min: 0 },
+    previousBalance: { type: Number, min: 0 },
+    currentBalance: { type: Number, min: 0 },
+    paymentType: { type: String, trim: true },
+    paidAmount: { type: Number, min: 0 },
     items: [orderItemSchema],
     packedStatus: {
       type: String,

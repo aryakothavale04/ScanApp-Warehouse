@@ -450,7 +450,16 @@ export async function uploadInvoice(req, res) {
     const items = await hydrateInvoiceItems(safeItems);
     const order = await Order.create({
       invoiceNo: parsed.invoiceNo,
+      date: parsed.date,
       customerName: parsed.customerName || "Walk-in Customer",
+      contact: parsed.contact,
+      subtotal: parsed.subtotal,
+      total: parsed.total,
+      balance: parsed.balance,
+      previousBalance: parsed.previousBalance,
+      currentBalance: parsed.currentBalance,
+      paymentType: parsed.paymentType,
+      paidAmount: parsed.paidAmount,
       items
     });
 

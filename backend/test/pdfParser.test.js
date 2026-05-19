@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { extractItems, pdfParserInternals } from "../src/services/pdfParser.js";
 
-const { parseVyaparRow } = pdfParserInternals;
+const { isolateMultilingualName, parseVyaparRow } = pdfParserInternals;
 
 describe("pdf parser", () => {
   it("removes trailing inferred quantity from product name when no barcode is present", () => {
@@ -42,6 +42,73 @@ describe("pdf parser", () => {
       [
         { productName: "Premium Sugar", quantity: 10 },
         { productName: "Tea Powder 250g", quantity: 4 }
+      ]
+    );
+  });
+
+  it("isolates native-script names and item codes from English product names", () => {
+    const item = parseVyaparRow("SA जाम पाट 5 Jam Party4 5 20");
+
+    assert.equal(item.itemCode, "SA");
+    assert.equal(item.hsnOrBarcode, "SA");
+    assert.equal(item.nativeName, "जाम पाट 5");
+    assert.equal(item.productName, "Jam Party");
+    assert.equal(item.quantity, 4);
+    assert.equal(item.pricePerUnit, 5);
+    assert.equal(item.totalAmount, 20);
+  });
+
+  it("keeps pack-size digits while removing attached invoice quantity", () => {
+    const item = parseVyaparRow("मायलो 10 Milo 103 10 30");
+
+    assert.equal(item.nativeName, "मायलो 10");
+    assert.equal(item.productName, "Milo 10");
+    assert.equal(item.quantity, 3);
+  });
+
+  it("keeps repeated short brand text when the first token is also the item code", () => {
+    const item = parseVyaparRow("Rk ब्लेड Rk Blade1 5 5");
+
+    assert.equal(item.itemCode, "Rk");
+    assert.equal(item.productName, "Rk Blade");
+    assert.equal(item.quantity, 1);
+  });
+
+  it("parses tab-separated positional columns without merging the amount fields into the name", () => {
+    const item = parseVyaparRow("SA जाम पाट 5 Jam Party4\t4\t5\t20");
+
+    assert.equal(item.itemCode, "SA");
+    assert.equal(item.productName, "Jam Party");
+    assert.equal(item.quantity, 4);
+    assert.equal(item.unitPrice, 5);
+    assert.equal(item.amount, 20);
+  });
+
+  it("normalizes compact merged headers", () => {
+    assert.equal(isolateMultilingualName("SA जाम पाट 5 Jam Party4", 4).productName, "Jam Party");
+  });
+  it("extracts serial/native/detail rows from machine-readable Vyapar text", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "1",
+      "SA \u091c\u093e\u092e Rs 5",
+      "Jam Party4 Rs 52 Rs 208",
+      "2",
+      "Rk \u092c\u094d\u0932\u0947\u0921",
+      "Rk Blade1 Rs 42 Rs 42",
+      "Total32 Rs 250"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        productName: item.productName,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { productName: "Jam Party", quantity: 4, pricePerUnit: 52, totalAmount: 208 },
+        { productName: "Rk Blade", quantity: 1, pricePerUnit: 42, totalAmount: 42 }
       ]
     );
   });
