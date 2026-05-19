@@ -182,8 +182,8 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                  <>
                   {!scanningMode && (
-                    <>
                     <button
                       onClick={() => (isEditing ? cancelEditing() : startEditing(index, item))}
                       className="grid h-8 w-8 place-items-center rounded-lg border border-black/10 bg-white text-black/70 sm:h-10 sm:w-10"
@@ -192,18 +192,18 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                     >
                       {isEditing ? <X size={18} /> : <Edit3 size={18} />}
                     </button>
+                  )}
                     <button
                       type="button"
                       onClick={() => setDeleteTarget({ index, item })}
                       disabled={busyAction === `delete-${index}`}
-                      className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 bg-white text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 sm:h-10 sm:w-10"
+                      className={`grid place-items-center border border-red-200 bg-white text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 ${scanningMode ? "h-7 w-7 rounded-full sm:h-8 sm:w-8" : "h-8 w-8 rounded-lg sm:h-10 sm:w-10"}`}
                       aria-label={`Move ${item.productName || "product"} to trash`}
                       title="Move product to trash"
                     >
-                      {busyAction === `delete-${index}` ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                      {busyAction === `delete-${index}` ? <Loader2 className="animate-spin" size={actionIconSize} /> : <Trash2 size={actionIconSize} />}
                     </button>
-                    </>
-                  )}
+                  </>
                   <div className={`grid place-items-center rounded-full ${scanningMode ? "h-7 w-7 sm:h-8 sm:w-8" : "h-8 w-8 sm:h-10 sm:w-10"} ${done ? "bg-emerald-600 text-white" : "bg-black/5 text-black/40 dark:bg-white/10 dark:text-white/50"}`}>
                     {done ? <Check size={scanningMode ? 16 : 20} /> : <PackageX size={scanningMode ? 15 : 18} />}
                   </div>
