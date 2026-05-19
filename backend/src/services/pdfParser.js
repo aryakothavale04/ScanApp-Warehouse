@@ -115,6 +115,19 @@ function findAmountAfterLabel(lines, labels, { reverse = true } = {}) {
   return matches.length ? toNumber(matches.at(-1)[0]) : null;
 }
 
+function findSignedAmountAfterLabel(lines, labels, options) {
+  const labelPattern = new RegExp(`\\b(?:${labels.join("|")})\\b`, "i");
+  const searchLines = options?.reverse === false ? lines : [...lines].reverse();
+  const line = searchLines.find((entry) => labelPattern.test(entry));
+  if (!line) return null;
+
+  const matches = [...line.matchAll(/-?\s*(?:Rs|INR)?\s*([\d,]+(?:\.\d+)?)/gi)];
+  if (!matches.length) return null;
+
+  const value = toNumber(matches.at(-1)[1]);
+  return /-\s*(?:Rs|INR|₹)?\s*[\d,]+(?:\.\d+)?/i.test(line) ? -value : value;
+}
+
 function extractSummaryFields(lines) {
   const paymentTypeIndex = lines.findIndex((line) => /\bpayment\s*type\b/i.test(line));
   const paymentType = paymentTypeIndex >= 0
@@ -124,6 +137,7 @@ function extractSummaryFields(lines) {
   return {
     subtotal: findAmountAfterLabel(lines, ["sub\\s*total", "subtotal"]),
     total: findAmountAfterLabel(lines, ["grand\\s*total", "total"]),
+    roundOff: findSignedAmountAfterLabel(lines, ["round\\s*off"]),
     balance: findAmountAfterLabel(lines, ["^balance", "balance\\s*due"], { reverse: false }),
     previousBalance: findAmountAfterLabel(lines, ["previous\\s*balance"]),
     currentBalance: findAmountAfterLabel(lines, ["current\\s*balance"]),
@@ -423,6 +437,36 @@ function splitAttachedInferredQuantity(name, inferredQuantity) {
   return productName ? { productName, quantity: roundedInferredQuantity } : null;
 }
 
+function splitAttachedQuantityByAmount(name, pricePerUnit, totalAmount) {
+  if (!name || !Number.isFinite(pricePerUnit) || pricePerUnit <= 0 || !Number.isFinite(totalAmount) || totalAmount <= 0) {
+    return null;
+  }
+
+  const match = name.match(/(\d{1,5})$/);
+  if (!match) return null;
+
+  const digits = match[1];
+  const candidates = [];
+  for (let length = 1; length <= digits.length; length += 1) {
+    const quantityText = digits.slice(-length);
+    const quantity = toNumber(quantityText);
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+
+    const productDigits = digits.slice(0, -length);
+    const difference = Math.abs((quantity * pricePerUnit) - totalAmount);
+    candidates.push({ productDigits, quantity, difference });
+  }
+
+  const best = candidates
+    .filter((candidate) => candidate.difference <= Math.max(1.25, pricePerUnit * 0.35))
+    .sort((left, right) => left.difference - right.difference || right.quantity - left.quantity)[0];
+
+  if (!best) return null;
+
+  const productName = `${name.slice(0, match.index)}${best.productDigits}`.trim();
+  return productName ? { productName, quantity: best.quantity } : null;
+}
+
 function hasLatin(value = "") {
   return /[A-Za-z]/.test(value);
 }
@@ -431,7 +475,7 @@ function hasNativeScript(value = "") {
   return /[^\u0000-\u007F]/.test(value);
 }
 
-function isolateMultilingualName(rawName = "", inferredQuantity) {
+function isolateMultilingualName(rawName = "", inferredQuantity, pricePerUnit = null, totalAmount = null) {
   let working = cleanProductName(rawName);
   let quantity = null;
 
@@ -444,6 +488,14 @@ function isolateMultilingualName(rawName = "", inferredQuantity) {
     if (spacedQuantity) {
       working = spacedQuantity.productName;
       quantity = spacedQuantity.quantity;
+    }
+  }
+
+  if (quantity === null) {
+    const amountQuantity = splitAttachedQuantityByAmount(working, pricePerUnit, totalAmount);
+    if (amountQuantity) {
+      working = amountQuantity.productName;
+      quantity = amountQuantity.quantity;
     }
   }
 
@@ -462,6 +514,7 @@ function isolateMultilingualName(rawName = "", inferredQuantity) {
       hasNativeScript(bodyTokens[index + 1] || "")
     )
   ));
+  const packPrice = packPriceToken ? toNumber(packPriceToken.match(/\d{1,3}/)?.[0]) : null;
 
   let bestStart = -1;
   let bestEnd = -1;
@@ -480,6 +533,12 @@ function isolateMultilingualName(rawName = "", inferredQuantity) {
   }
 
   let englishTokens = bestStart >= 0 ? bodyTokens.slice(bestStart, bestEnd) : [];
+  if (packPrice && englishTokens.length) {
+    englishTokens = englishTokens.map((token) => {
+      const escapedPackPrice = packPrice.toString().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return token.replace(new RegExp(`${escapedPackPrice}$`), "");
+    }).filter(Boolean);
+  }
   if (
     englishTokens.length &&
     bodyTokens.some(hasNativeScript) &&
@@ -496,7 +555,7 @@ function isolateMultilingualName(rawName = "", inferredQuantity) {
     itemCode,
     nativeName: nativeTokens.join(" ").trim(),
     productName: (englishTokens.length ? englishTokens : bodyTokens).join(" ").trim(),
-    packPrice: packPriceToken ? toNumber(packPriceToken.match(/\d{1,3}/)?.[0]) : null,
+    packPrice,
     quantity
   };
 }
@@ -515,6 +574,184 @@ function splitSerialPrefix(line, expectedSerial) {
   }
 
   return null;
+}
+
+function restoreDisplayCurrency(value = "") {
+  return value
+    .toString()
+    .replace(/\bRs\s*/gi, "₹")
+    .replace(/(\d)\s*x\s*(\d)/gi, "$1×$2")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isValidBarcode(value = "") {
+  return /^\d{6,14}$/.test(value.toString().trim());
+}
+
+function makeStrictItem({
+  serialNo,
+  itemName = "",
+  barcode = "",
+  quantity = 0,
+  pricePerUnit = 0,
+  totalAmount = 0,
+  invoiceLine = ""
+}) {
+  const cleanName = restoreDisplayCurrency(itemName);
+  const cleanBarcode = isValidBarcode(barcode) ? barcode.toString().trim() : "";
+  const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
+  const safePrice = Number.isFinite(pricePerUnit) && pricePerUnit > 0 ? pricePerUnit : 0;
+  const safeTotal = Number.isFinite(totalAmount) && totalAmount > 0 ? totalAmount : 0;
+  const cleanInvoiceLine = restoreDisplayCurrency(invoiceLine);
+  const fallbackInvoiceLine = [
+    cleanName,
+    safeQuantity > 0 ? safeQuantity : "",
+    safePrice > 0 ? safePrice : "",
+    safeTotal > 0 ? safeTotal : ""
+  ].filter((part) => part !== "").join(" ");
+
+  return {
+    itemName: cleanName,
+    itemCode: cleanBarcode,
+    productName: cleanName,
+    hsnOrBarcode: cleanBarcode,
+    quantity: safeQuantity,
+    unitPrice: safePrice,
+    amount: safeTotal,
+    pricePerUnit: safePrice,
+    totalAmount: safeTotal,
+    invoiceLine: cleanInvoiceLine || fallbackInvoiceLine,
+    serialNo
+  };
+}
+
+function parseStrictAmountDetail(line = "") {
+  const currencyMatches = [...line.matchAll(/(?:₹|Rs|INR)\s*([\d,]+(?:\.\d+)?)/gi)];
+  if (currencyMatches.length < 2) return null;
+
+  const priceMatch = currencyMatches.at(-2);
+  const amountMatch = currencyMatches.at(-1);
+  const pricePerUnit = toNumber(priceMatch[1]);
+  const totalAmount = toNumber(amountMatch[1]);
+  if (!Number.isFinite(pricePerUnit) || pricePerUnit <= 0 || !Number.isFinite(totalAmount) || totalAmount <= 0) return null;
+
+  const beforePrice = line.slice(0, priceMatch.index).trim();
+  const chooseQuantitySplit = (digits) => {
+    const candidates = [];
+    for (let length = 1; length <= digits.length; length += 1) {
+      const quantityText = digits.slice(-length);
+      const quantity = toNumber(quantityText);
+      if (!Number.isFinite(quantity) || quantity <= 0) continue;
+      candidates.push({
+        prefixDigits: digits.slice(0, -length),
+        quantity,
+        difference: Math.abs((quantity * pricePerUnit) - totalAmount)
+      });
+    }
+
+    return candidates
+      .filter((candidate) => candidate.difference <= Math.max(1.25, pricePerUnit * 0.35))
+      .sort((left, right) => left.difference - right.difference || right.quantity - left.quantity)[0] || null;
+  };
+
+  const barcodeQuantityMatch = beforePrice.match(/(\d{6,18})$/);
+  if (barcodeQuantityMatch) {
+    const split = chooseQuantitySplit(barcodeQuantityMatch[1]);
+    const barcode = split?.prefixDigits || "";
+    const quantity = split?.quantity || 0;
+    return {
+      barcode: isValidBarcode(barcode) ? barcode : "",
+      quantity,
+      pricePerUnit,
+      totalAmount,
+      codeColumnText: beforePrice.slice(0, barcodeQuantityMatch.index).trim()
+    };
+  }
+
+  const compactCurrencyQuantity = beforePrice.match(/(?:₹|Rs|INR)\s*(\d{2,8})$/i);
+  if (compactCurrencyQuantity) {
+    const split = chooseQuantitySplit(compactCurrencyQuantity[1]);
+    return {
+      barcode: "",
+      quantity: split?.quantity || 0,
+      pricePerUnit,
+      totalAmount,
+      codeColumnText: beforePrice.slice(0, compactCurrencyQuantity.index).trim()
+    };
+  }
+
+  const trailingQuantityMatch = beforePrice.match(/(\d{1,5})$/);
+  if (trailingQuantityMatch) {
+    const split = chooseQuantitySplit(trailingQuantityMatch[1]);
+    const quantity = split?.quantity || toNumber(trailingQuantityMatch[1]);
+    const prefixDigits = split?.prefixDigits ?? "";
+    return {
+      barcode: "",
+      quantity,
+      pricePerUnit,
+      totalAmount,
+      codeColumnText: `${beforePrice.slice(0, trailingQuantityMatch.index)}${prefixDigits}`.trim()
+    };
+  }
+
+  return {
+    barcode: "",
+    quantity: 0,
+    pricePerUnit,
+    totalAmount,
+    codeColumnText: beforePrice
+  };
+}
+
+function isLikelyItemNameContinuation(line = "") {
+  const restored = restoreDisplayCurrency(line);
+  return !hasLatin(restored) || /(?:₹|Rs)\s*\d+\s*[x×]\s*\d+/i.test(restored) || /\d+\s*[x×]\s*\d+\s*(?:pic|pcs?)?$/i.test(restored);
+}
+
+function pickStrictItemNameParts(parts, detailIndex) {
+  const beforeDetail = parts.slice(0, detailIndex);
+  if (!beforeDetail.length) return [];
+  if (beforeDetail.length === 1) return beforeDetail;
+  if (hasLatin(beforeDetail[0])) return beforeDetail;
+
+  const itemNameParts = [];
+  for (const part of beforeDetail) {
+    if (!itemNameParts.length || isLikelyItemNameContinuation(part)) {
+      itemNameParts.push(part);
+      continue;
+    }
+    break;
+  }
+
+  return itemNameParts;
+}
+
+function parseStrictRowGroup(group) {
+  const parts = group.parts || [];
+  const detailIndex = parts.findIndex((part) => parseStrictAmountDetail(part));
+  if (detailIndex < 0) {
+    return makeStrictItem({
+      serialNo: group.serialNo,
+      itemName: parts[0] || ""
+    });
+  }
+
+  const detail = parseStrictAmountDetail(parts[detailIndex]);
+  const itemNameParts = pickStrictItemNameParts(parts, detailIndex);
+  const itemName = itemNameParts.length
+    ? itemNameParts.join(" ")
+    : restoreDisplayCurrency(detail.codeColumnText);
+
+  return makeStrictItem({
+    serialNo: group.serialNo,
+    itemName,
+    barcode: detail.barcode,
+    quantity: detail.quantity,
+    pricePerUnit: detail.pricePerUnit,
+    totalAmount: detail.totalAmount,
+    invoiceLine: `${itemName} ${detail.barcode} ${detail.quantity} ${detail.pricePerUnit} ${detail.totalAmount}`.trim()
+  });
 }
 
 function parseVyaparRow(row) {
@@ -570,7 +807,7 @@ function parseVyaparRow(row) {
     }
   }
 
-  const multilingualName = isolateMultilingualName(productName, inferredQuantity);
+  const multilingualName = isolateMultilingualName(productName, inferredQuantity, amounts.pricePerUnit, amounts.totalAmount);
   productName = multilingualName.productName;
   nativeName = multilingualName.nativeName;
   quantity = quantity ?? multilingualName.quantity;
@@ -602,7 +839,7 @@ function parseSeparatedVyaparRows(lines) {
 
     const serialPrefix = splitSerialPrefix(line, expectedSerial);
     if (serialPrefix) {
-      if (current?.parts.length) rowGroups.push(current);
+      if (current) rowGroups.push(current);
       current = { serialNo: serialPrefix.serialNo, parts: [] };
       expectedSerial = serialPrefix.serialNo + 1;
       if (serialPrefix.rest) current.parts.push(serialPrefix.rest);
@@ -612,14 +849,18 @@ function parseSeparatedVyaparRows(lines) {
     if (current) current.parts.push(line);
   }
 
-  if (current?.parts.length) rowGroups.push(current);
+  if (current) rowGroups.push(current);
 
   for (const group of rowGroups) {
-    const row = group.parts.join(" ");
-    const parsed = parseVyaparRow(row);
-    if (parsed) {
-      parsed.serialNo = group.serialNo;
-      rows.push(parsed);
+    try {
+      rows.push(parseStrictRowGroup(group));
+    } catch (error) {
+      console.warn("Malformed strict invoice row preserved with fallbacks:", {
+        serialNo: group?.serialNo,
+        parts: group?.parts,
+        message: error?.message
+      });
+      rows.push(makeStrictItem({ serialNo: group?.serialNo }));
     }
   }
 
@@ -645,29 +886,12 @@ function pushItem(itemLines, item, row) {
 }
 
 function mergeInvoiceItems(items) {
-  const merged = new Map();
-  for (const item of items) {
-    if (!item?.productName || !Number.isFinite(item.quantity) || item.quantity <= 0) {
-      logMalformedRow(item);
-      continue;
-    }
-
-    const key = `${normalizeNameKey(item.productName)}|${item.hsnOrBarcode || ""}|${item.pricePerUnit || 0}`;
-    const previous = merged.get(key);
-    if (previous) {
-      previous.quantity = Number((previous.quantity + item.quantity).toFixed(3));
-      previous.totalAmount = Number(((previous.totalAmount || 0) + (item.totalAmount || 0)).toFixed(2));
-    } else {
-      merged.set(key, { ...item });
-    }
-  }
-
-  return Array.from(merged.values());
+  return (items || []).filter(Boolean);
 }
 
 export function extractItems(lines) {
   const candidates = [...extractVyaparItems(lines)];
-  if (candidates.length) return mergeInvoiceItems(candidates);
+  if (candidates.length) return candidates;
 
   const itemLines = [];
   const detailPattern = /^([A-Z0-9\-/]+)\s*(?:(\d+(?:\.\d+)?)\s+)?[^\d]*([\d,]+(?:\.\d+)?)\s+[^\d]*([\d,]+(?:\.\d+)?)/i;
@@ -791,7 +1015,6 @@ export function extractItems(lines) {
 export async function parseVyaparInvoice(buffer) {
   try {
     const parsed = await pdfParse(buffer);
-    console.log("Extracted PDF text:", parsed?.text || "");
 
     const lines = cleanLines(parsed?.text);
     if (lines.length < 5) {
@@ -818,12 +1041,12 @@ export async function parseVyaparInvoice(buffer) {
       items,
       subtotal: summary.subtotal ?? itemsTotal,
       total: summary.total ?? summary.subtotal ?? itemsTotal,
+      roundOff: summary.roundOff,
       balance: summary.balance ?? 0,
       previousBalance: summary.previousBalance,
       currentBalance: summary.currentBalance,
       paymentType: summary.paymentType,
-      paidAmount: summary.paidAmount,
-      rawText: parsed?.text || ""
+      paidAmount: summary.paidAmount
     };
   } catch (error) {
     console.error("Parser error:", error);

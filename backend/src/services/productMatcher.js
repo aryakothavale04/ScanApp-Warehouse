@@ -31,27 +31,35 @@ export async function hydrateInvoiceItems(items) {
   const hydrated = [];
 
   for (const item of items || []) {
-    if (!item?.productName || !Number.isFinite(item.quantity) || item.quantity <= 0) {
-      console.warn("Failed row:", item);
-      continue;
+    const itemName = item?.itemName || item?.productName || "";
+    const quantity = Number.isFinite(item?.quantity) ? item.quantity : 0;
+    let product = null;
+
+    try {
+      product = await findProductForInvoiceName(itemName, item?.hsnOrBarcode);
+    } catch (error) {
+      console.warn("Product match failed; preserving invoice row:", {
+        serialNo: item?.serialNo,
+        itemName,
+        message: error?.message
+      });
     }
 
-    const product = await findProductForInvoiceName(item.productName, item.hsnOrBarcode);
     hydrated.push({
       productId: product?._id,
-      serialNo: item.serialNo,
-      itemCode: item.itemCode || item.hsnOrBarcode || "",
-      itemName: product?.productName || item.itemName || item.productName,
-      nativeName: item.nativeName || "",
-      productName: product?.productName || item.productName,
-      hsnOrBarcode: item.hsnOrBarcode || "",
-      quantity: item.quantity,
-      unitPrice: item.unitPrice ?? item.pricePerUnit,
-      amount: item.amount ?? item.totalAmount,
-      pricePerUnit: item.pricePerUnit,
-      totalAmount: item.totalAmount,
+      serialNo: item?.serialNo,
+      itemCode: item?.itemCode || item?.hsnOrBarcode || "",
+      itemName,
+      nativeName: item?.nativeName || "",
+      productName: itemName,
+      hsnOrBarcode: item?.hsnOrBarcode || "",
+      quantity,
+      unitPrice: item?.unitPrice ?? item?.pricePerUnit ?? 0,
+      amount: item?.amount ?? item?.totalAmount ?? 0,
+      pricePerUnit: item?.pricePerUnit ?? item?.unitPrice ?? 0,
+      totalAmount: item?.totalAmount ?? item?.amount ?? 0,
       packedQuantity: 0,
-      invoiceLine: item.invoiceLine
+      invoiceLine: item?.invoiceLine || ""
     });
   }
 

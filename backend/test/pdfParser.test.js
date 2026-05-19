@@ -62,7 +62,7 @@ describe("pdf parser", () => {
     const item = parseVyaparRow("मायलो 10 Milo 103 10 30");
 
     assert.equal(item.nativeName, "मायलो 10");
-    assert.equal(item.productName, "Milo 10");
+    assert.equal(item.productName, "Milo ₹10");
     assert.equal(item.quantity, 3);
   });
 
@@ -85,6 +85,19 @@ describe("pdf parser", () => {
     assert.equal(fiveRupeeItem.hsnOrBarcode, "");
     assert.equal(slashPriceItem.itemCode, "");
     assert.equal(slashPriceItem.hsnOrBarcode, "");
+  });
+
+  it("splits merged pack price and rounded quantity values", () => {
+    const highValuePack = parseVyaparRow("Rs 20 लेस Lays American Onion Rs 2030 Rs 16.3 Rs 489");
+    const roundedAmountPack = parseVyaparRow("Rs 5 लेस Lays American Onion240 Rs 3.92 Rs 940");
+    const mergedPackQuantity = parseVyaparRow("Rs 10 लेस Lays Magic Masala Rs 10144 Rs 8.17 Rs 1,176");
+
+    assert.equal(highValuePack.productName, "Lays American Onion ₹20");
+    assert.equal(highValuePack.quantity, 30);
+    assert.equal(roundedAmountPack.productName, "Lays American Onion ₹5");
+    assert.equal(roundedAmountPack.quantity, 240);
+    assert.equal(mergedPackQuantity.productName, "Lays Magic Masala ₹10");
+    assert.equal(mergedPackQuantity.quantity, 144);
   });
 
   it("parses tab-separated positional columns without merging the amount fields into the name", () => {
@@ -120,8 +133,64 @@ describe("pdf parser", () => {
         totalAmount: item.totalAmount
       })),
       [
-        { productName: "Jam Party", quantity: 4, pricePerUnit: 52, totalAmount: 208 },
-        { productName: "Rk Blade", quantity: 1, pricePerUnit: 42, totalAmount: 42 }
+        { productName: "SA जाम ₹5", quantity: 4, pricePerUnit: 52, totalAmount: 208 },
+        { productName: "Rk ब्लेड", quantity: 1, pricePerUnit: 42, totalAmount: 42 }
+      ]
+    );
+  });
+
+  it("preserves serial rows even when row values are missing", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "1",
+      "2",
+      "\u0932\u0947\u0938",
+      "Lays Onion1 Rs 10 Rs 10",
+      "Total1 Rs 10"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        hsnOrBarcode: item.hsnOrBarcode,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 1, productName: "", hsnOrBarcode: "", quantity: 0, pricePerUnit: 0, totalAmount: 0 },
+        { serialNo: 2, productName: "लेस", hsnOrBarcode: "", quantity: 1, pricePerUnit: 10, totalAmount: 10 }
+      ]
+    );
+  });
+
+  it("keeps duplicate products as separate serial-numbered rows", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "1",
+      "\u0932\u0947\u0938",
+      "Lays Onion1 Rs 10 Rs 10",
+      "2",
+      "\u0932\u0947\u0938",
+      "Lays Onion1 Rs 10 Rs 10",
+      "3",
+      "\u0932\u0947\u0938",
+      "Lays Onion1 Rs 10 Rs 10",
+      "Total3 Rs 30"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        quantity: item.quantity,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 1, productName: "लेस", quantity: 1, totalAmount: 10 },
+        { serialNo: 2, productName: "लेस", quantity: 1, totalAmount: 10 },
+        { serialNo: 3, productName: "लेस", quantity: 1, totalAmount: 10 }
       ]
     );
   });
@@ -139,6 +208,10 @@ describe("pdf parser", () => {
       "89023517777801 Rs 52 Rs 52",
       "18Fair And Lovely1 Rs 115 Rs 115",
       "1913x161 Rs 70 Rs 70",
+      "20",
+      "\u0938\u094b \u092c\u0940 \u0938\u094d\u0915\u094b",
+      "Rs 5x12pic",
+      "Sobisco Cream Milk1 Rs 52 Rs 52",
       "Total4 Rs 289"
     ]);
 
@@ -151,10 +224,11 @@ describe("pdf parser", () => {
         totalAmount: item.totalAmount
       })),
       [
-        { serialNo: 16, productName: "Sobisco Cream Chocolate 31.8g ₹5", hsnOrBarcode: "", quantity: 1, totalAmount: 52 },
-        { serialNo: 17, productName: "cake 5x12pic", hsnOrBarcode: "8902351777780", quantity: 1, totalAmount: 52 },
+        { serialNo: 16, productName: "सोबीस्को चॉकोलेट 5/-", hsnOrBarcode: "", quantity: 1, totalAmount: 52 },
+        { serialNo: 17, productName: "लोकल cake ₹5×12pic", hsnOrBarcode: "8902351777780", quantity: 1, totalAmount: 52 },
         { serialNo: 18, productName: "Fair And Lovely", hsnOrBarcode: "", quantity: 1, totalAmount: 115 },
-        { serialNo: 19, productName: "13x16", hsnOrBarcode: "", quantity: 1, totalAmount: 70 }
+        { serialNo: 19, productName: "13×16", hsnOrBarcode: "", quantity: 1, totalAmount: 70 },
+        { serialNo: 20, productName: "सो बी स्को ₹5×12pic", hsnOrBarcode: "", quantity: 1, totalAmount: 52 }
       ]
     );
   });

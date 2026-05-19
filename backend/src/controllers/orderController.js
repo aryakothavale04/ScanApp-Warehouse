@@ -427,24 +427,27 @@ export async function uploadInvoice(req, res) {
       return res.status(409).json({ success: false, message: `Invoice ${parsed.invoiceNo} already exists` });
     }
 
-    const safeItems = parsed.items.filter((item) => {
-      const valid = item?.productName && Number.isFinite(item.quantity) && item.quantity > 0;
-      if (!valid) {
-        console.warn("Failed row:", item);
-      }
-      return valid;
-    });
+    const safeItems = parsed.items.map((item, index) => ({
+      ...item,
+      serialNo: item?.serialNo || index + 1,
+      itemName: item?.itemName || item?.productName || "",
+      productName: item?.productName || item?.itemName || "",
+      hsnOrBarcode: item?.hsnOrBarcode || "",
+      itemCode: item?.itemCode || item?.hsnOrBarcode || "",
+      quantity: Number.isFinite(item?.quantity) ? item.quantity : 0,
+      unitPrice: item?.unitPrice ?? item?.pricePerUnit ?? 0,
+      amount: item?.amount ?? item?.totalAmount ?? 0,
+      pricePerUnit: item?.pricePerUnit ?? item?.unitPrice ?? 0,
+      totalAmount: item?.totalAmount ?? item?.amount ?? 0,
+      invoiceLine: item?.invoiceLine || ""
+    }));
 
     if (!safeItems.length) {
       return res.status(422).json({ success: false, message: "Unsupported invoice format" });
     }
 
     if (hasSuspiciousInvoiceItems(safeItems)) {
-      console.warn("Suspicious invoice parse rejected:", safeItems);
-      return res.status(422).json({
-        success: false,
-        message: "Invoice items were not cleanly extracted. Please upload the original Vyapar PDF export, not a photo, scan, or compressed shared copy."
-      });
+      console.warn("Suspicious invoice rows preserved with fallbacks:", safeItems);
     }
 
     const items = await hydrateInvoiceItems(safeItems);
@@ -455,6 +458,7 @@ export async function uploadInvoice(req, res) {
       contact: parsed.contact,
       subtotal: parsed.subtotal,
       total: parsed.total,
+      roundOff: parsed.roundOff,
       balance: parsed.balance,
       previousBalance: parsed.previousBalance,
       currentBalance: parsed.currentBalance,
