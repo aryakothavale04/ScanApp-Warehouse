@@ -215,8 +215,15 @@ function logMalformedRow(row) {
   console.warn("Failed row:", row);
 }
 
-function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, invoiceLine) {
-  const safeName = cleanEnglishProductName(productName);
+function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, invoiceLine, options = {}) {
+  let safeName = cleanEnglishProductName(productName);
+  const packPrice = Number.isFinite(options.packPrice) && options.packPrice > 0 ? options.packPrice : null;
+  if (
+    packPrice &&
+    !new RegExp(`(?:₹|Rs\\s*)?${packPrice}\\s*/?-?\\b`, "i").test(safeName)
+  ) {
+    safeName = `${safeName} ₹${packPrice}`.trim();
+  }
   const safePrice = Number.isFinite(pricePerUnit) ? pricePerUnit : 0;
   const safeTotal = Number.isFinite(totalAmount) ? totalAmount : 0;
 
@@ -447,6 +454,14 @@ function isolateMultilingualName(rawName = "", inferredQuantity) {
     itemCode = tokens[0];
     bodyTokens = tokens.slice(1);
   }
+  const packPriceToken = bodyTokens.find((token, index) => (
+    /^(\d{1,3})(?:\/-)?$/.test(token) &&
+    (
+      index === 0 ||
+      hasNativeScript(bodyTokens[index - 1] || "") ||
+      hasNativeScript(bodyTokens[index + 1] || "")
+    )
+  ));
 
   let bestStart = -1;
   let bestEnd = -1;
@@ -481,6 +496,7 @@ function isolateMultilingualName(rawName = "", inferredQuantity) {
     itemCode,
     nativeName: nativeTokens.join(" ").trim(),
     productName: (englishTokens.length ? englishTokens : bodyTokens).join(" ").trim(),
+    packPrice: packPriceToken ? toNumber(packPriceToken.match(/\d{1,3}/)?.[0]) : null,
     quantity
   };
 }
@@ -559,6 +575,7 @@ function parseVyaparRow(row) {
   nativeName = multilingualName.nativeName;
   quantity = quantity ?? multilingualName.quantity;
   hsnOrBarcode = hsnOrBarcode || multilingualName.itemCode;
+  const packPrice = hsnOrBarcode ? null : multilingualName.packPrice;
 
   const item = buildItem(
     productName,
@@ -566,7 +583,8 @@ function parseVyaparRow(row) {
     quantity,
     amounts.pricePerUnit,
     amounts.totalAmount,
-    row
+    row,
+    { packPrice }
   );
   if (item && nativeName) item.nativeName = nativeName;
   return item;

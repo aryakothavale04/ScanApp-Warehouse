@@ -76,8 +76,11 @@ describe("pdf parser", () => {
 
   it("does not treat pack price markers as item codes", () => {
     const fiveRupeeItem = parseVyaparRow("Rs 5 लेस Lays Classic Salted2 Rs 52 Rs 104");
+    const mergedPackItem = parseVyaparRow("Rs 5 लेस Lays Spanish Tomato Rs 52 Rs 52 Rs 104");
     const slashPriceItem = parseVyaparRow("2/- शेव सामोसा Shev Samosa1 Rs 52 Rs 52");
 
+    assert.equal(fiveRupeeItem.productName, "Lays Classic Salted ₹5");
+    assert.equal(mergedPackItem.productName, "Lays Spanish Tomato ₹5");
     assert.equal(fiveRupeeItem.itemCode, "");
     assert.equal(fiveRupeeItem.hsnOrBarcode, "");
     assert.equal(slashPriceItem.itemCode, "");
@@ -148,7 +151,7 @@ describe("pdf parser", () => {
         totalAmount: item.totalAmount
       })),
       [
-        { serialNo: 16, productName: "Sobisco Cream Chocolate 31.8g", hsnOrBarcode: "", quantity: 1, totalAmount: 52 },
+        { serialNo: 16, productName: "Sobisco Cream Chocolate 31.8g ₹5", hsnOrBarcode: "", quantity: 1, totalAmount: 52 },
         { serialNo: 17, productName: "cake 5x12pic", hsnOrBarcode: "8902351777780", quantity: 1, totalAmount: 52 },
         { serialNo: 18, productName: "Fair And Lovely", hsnOrBarcode: "", quantity: 1, totalAmount: 115 },
         { serialNo: 19, productName: "13x16", hsnOrBarcode: "", quantity: 1, totalAmount: 70 }
