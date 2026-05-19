@@ -79,6 +79,7 @@ export const api = {
     data: {}
   }),
   permanentlyDeleteOrder: (id) => request(`/api/orders/${id}/permanent`, "delete"),
+  emptyTrash: () => request("/api/orders/trash/empty", "delete"),
   uploadInvoice: (file) => {
     const formData = new FormData();
     formData.append("invoice", file);
@@ -104,6 +105,7 @@ export const api = {
     request(`/api/orders/${orderId}/items`, "post", {
       data: item
     }),
+  deleteOrderItem: (orderId, itemIndex) => request(`/api/orders/${orderId}/items/${itemIndex}`, "delete"),
   manualPackOrderItem: (orderId, itemIndex, scannedBy = "packing-staff") =>
     request(`/api/orders/${orderId}/items/${itemIndex}/manual-pack`, "post", {
       data: { scannedBy }

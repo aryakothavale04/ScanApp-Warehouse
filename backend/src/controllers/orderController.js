@@ -8,6 +8,63 @@ function populateOrder(query) {
   return query.populate("items.productId", "productName barcode aliases category");
 }
 
+const TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+function isItemTrashed(item) {
+  return Boolean(item?.trashedAt);
+}
+
+function getActiveItems(items = []) {
+  return items.filter((item) => !isItemTrashed(item));
+}
+
+function getDeletedItems(items = []) {
+  return items.filter(isItemTrashed);
+}
+
+function buildProgress(items = []) {
+  return {
+    totalQuantity: items.reduce((sum, item) => sum + (item.quantity || 0), 0),
+    packedQuantity: items.reduce((sum, item) => sum + (item.packedQuantity || 0), 0)
+  };
+}
+
+function serializeOrder(order, { includeDeletedItems = false } = {}) {
+  const data = typeof order?.toObject === "function" ? order.toObject({ virtuals: true }) : order;
+  if (!data) return data;
+
+  const activeItems = getActiveItems(data.items || []);
+  const deletedItems = (data.items || []).flatMap((item, originalIndex) => isItemTrashed(item) ? [{
+    ...item,
+    originalIndex,
+    orderId: data._id,
+    invoiceNo: data.invoiceNo,
+    customerName: data.customerName,
+    deletedAt: item.trashedAt
+  }] : []);
+
+  return {
+    ...data,
+    items: includeDeletedItems ? data.items || [] : activeItems,
+    deletedItems: includeDeletedItems ? deletedItems : undefined,
+    progress: buildProgress(activeItems)
+  };
+}
+
+function serializeOrders(orders = [], options) {
+  return orders.map((order) => serializeOrder(order, options));
+}
+
+function getDeletedOrderItems(orders = []) {
+  return orders.flatMap((order) => {
+    const data = serializeOrder(order, { includeDeletedItems: true });
+    return (data.deletedItems || []).map((item) => ({
+      ...item,
+      deleteAfter: new Date(new Date(item.trashedAt).getTime() + TRASH_RETENTION_MS)
+    }));
+  });
+}
+
 function normalizeBarcode(value = "") {
   return value?.toString().trim().replace(/\D/g, "") || "";
 }
@@ -43,23 +100,24 @@ function findOrderItemByScan(order, scannedValue) {
   if (!scannedBarcode && !scannedText) return null;
 
   const getItemBarcode = (entry) => normalizeBarcode(entry.hsnOrBarcode || entry.productId?.barcode);
-  const exactMatch = scannedBarcode ? order.items.find((entry) => getItemBarcode(entry) === scannedBarcode) : null;
+  const activeItems = getActiveItems(order.items || []);
+  const exactMatch = scannedBarcode ? activeItems.find((entry) => getItemBarcode(entry) === scannedBarcode) : null;
   if (exactMatch) return exactMatch;
 
   const withoutLeadingZeros = scannedBarcode.replace(/^0+/, "");
-  const leadingZeroMatch = scannedBarcode ? order.items.find((entry) => {
+  const leadingZeroMatch = scannedBarcode ? activeItems.find((entry) => {
     const itemBarcode = getItemBarcode(entry).replace(/^0+/, "");
     return itemBarcode && itemBarcode === withoutLeadingZeros;
   }) : null;
   if (leadingZeroMatch) return leadingZeroMatch;
 
-  const textMatches = scannedText ? order.items.filter((entry) => {
+  const textMatches = scannedText ? activeItems.filter((entry) => {
     const candidates = getItemScanCandidates(entry).map(normalizeScanText).filter(Boolean);
     return candidates.some((candidate) => candidate === scannedText || candidate.includes(scannedText) || scannedText.includes(candidate));
   }) : [];
   if (textMatches.length === 1) return textMatches[0];
 
-  const nearMatches = scannedBarcode ? order.items.filter((entry) => {
+  const nearMatches = scannedBarcode ? activeItems.filter((entry) => {
     const itemBarcode = getItemBarcode(entry);
     const lengthDifference = Math.abs(itemBarcode.length - scannedBarcode.length);
     return itemBarcode && lengthDifference <= 1 && (itemBarcode.includes(scannedBarcode) || scannedBarcode.includes(itemBarcode));
@@ -70,8 +128,9 @@ function findOrderItemByScan(order, scannedValue) {
 
 function getOrderItemByIndex(order, itemIndex) {
   const index = Number.parseInt(itemIndex, 10);
-  if (!Number.isInteger(index) || index < 0 || index >= order.items.length) return null;
-  return order.items[index];
+  const activeItems = getActiveItems(order.items || []);
+  if (!Number.isInteger(index) || index < 0 || index >= activeItems.length) return null;
+  return activeItems[index];
 }
 
 function hasSuspiciousInvoiceItems(items = []) {
@@ -96,26 +155,41 @@ function hasSuspiciousInvoiceItems(items = []) {
 }
 
 export async function purgeExpiredTrashedOrders() {
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() - TRASH_RETENTION_MS);
   const expiredOrders = await Order.find({ trashedAt: { $lte: cutoff } }).select("_id").lean();
-  if (!expiredOrders.length) return { deletedCount: 0 };
+  const ordersWithExpiredItems = await Order.find({ "items.trashedAt": { $lte: cutoff }, trashedAt: { $exists: false } });
+  let deletedItemCount = 0;
+
+  for (const order of ordersWithExpiredItems) {
+    const beforeCount = order.items.length;
+    order.items = order.items.filter((item) => !item.trashedAt || item.trashedAt > cutoff);
+    deletedItemCount += beforeCount - order.items.length;
+    order.recalculateStatus();
+    await order.save();
+  }
+
+  if (!expiredOrders.length) return { deletedCount: 0, deletedItemCount };
 
   const expiredOrderIds = expiredOrders.map((order) => order._id);
   await PackingLog.deleteMany({ orderId: { $in: expiredOrderIds } });
   const result = await Order.deleteMany({ _id: { $in: expiredOrderIds } });
-  return { deletedCount: result.deletedCount || 0 };
+  return { deletedCount: result.deletedCount || 0, deletedItemCount };
 }
 
 export async function listOrders(req, res) {
   await purgeExpiredTrashedOrders();
   const orders = await populateOrder(Order.find({ trashedAt: { $exists: false } }).sort({ createdAt: -1 }));
-  res.json({ orders });
+  res.json({ orders: serializeOrders(orders) });
 }
 
 export async function listTrashedOrders(req, res) {
   await purgeExpiredTrashedOrders();
   const orders = await populateOrder(Order.find({ trashedAt: { $exists: true } }).sort({ trashedAt: -1 }));
-  res.json({ orders });
+  const ordersWithDeletedItems = await populateOrder(Order.find({ "items.trashedAt": { $exists: true }, trashedAt: { $exists: false } }).sort({ updatedAt: -1 }));
+  res.json({
+    orders: serializeOrders(orders, { includeDeletedItems: true }),
+    items: getDeletedOrderItems(ordersWithDeletedItems)
+  });
 }
 
 export async function getOrder(req, res) {
@@ -123,7 +197,7 @@ export async function getOrder(req, res) {
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
-  res.json({ order });
+  res.json({ order: serializeOrder(order) });
 }
 
 export async function deleteOrder(req, res) {
@@ -147,7 +221,7 @@ export async function restoreOrder(req, res) {
   await order.save();
 
   const populated = await populateOrder(Order.findById(order._id));
-  res.json({ message: "Order restored", order: populated });
+  res.json({ message: "Order restored", order: serializeOrder(populated) });
 }
 
 export async function permanentlyDeleteOrder(req, res) {
@@ -158,6 +232,30 @@ export async function permanentlyDeleteOrder(req, res) {
 
   await PackingLog.deleteMany({ orderId: order._id });
   res.json({ success: true, deletedOrderId: order._id, message: "Order permanently deleted" });
+}
+
+export async function emptyTrash(req, res) {
+  const trashedOrders = await Order.find({ trashedAt: { $exists: true } }).select("_id").lean();
+  const trashedOrderIds = trashedOrders.map((order) => order._id);
+  let deletedOrderCount = 0;
+  let deletedItemCount = 0;
+
+  if (trashedOrderIds.length) {
+    await PackingLog.deleteMany({ orderId: { $in: trashedOrderIds } });
+    const result = await Order.deleteMany({ _id: { $in: trashedOrderIds } });
+    deletedOrderCount = result.deletedCount || 0;
+  }
+
+  const ordersWithDeletedItems = await Order.find({ "items.trashedAt": { $exists: true }, trashedAt: { $exists: false } });
+  for (const order of ordersWithDeletedItems) {
+    const beforeCount = order.items.length;
+    order.items = order.items.filter((item) => !item.trashedAt);
+    deletedItemCount += beforeCount - order.items.length;
+    order.recalculateStatus();
+    await order.save();
+  }
+
+  res.json({ success: true, deletedOrderCount, deletedItemCount, message: "Trash emptied" });
 }
 
 export async function updateOrder(req, res) {
@@ -175,7 +273,7 @@ export async function updateOrder(req, res) {
   await order.save();
 
   const populated = await populateOrder(Order.findById(order._id));
-  res.json({ message: "Party name updated", order: populated });
+  res.json({ message: "Party name updated", order: serializeOrder(populated) });
 }
 
 export async function addOrderItem(req, res) {
@@ -209,7 +307,7 @@ export async function addOrderItem(req, res) {
   await order.save();
 
   const populated = await populateOrder(Order.findById(order._id));
-  res.status(201).json({ message: "Item added", order: populated });
+  res.status(201).json({ message: "Item added", order: serializeOrder(populated) });
 }
 
 export async function updateOrderItem(req, res) {
@@ -243,7 +341,27 @@ export async function updateOrderItem(req, res) {
   await order.save();
 
   const populated = await populateOrder(Order.findById(order._id));
-  res.json({ message: `${item.productName} updated`, order: populated });
+  res.json({ message: `${item.productName} updated`, order: serializeOrder(populated) });
+}
+
+export async function deleteOrderItem(req, res) {
+  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const item = getOrderItemByIndex(order, req.params.itemIndex);
+  if (!item) {
+    return res.status(404).json({ message: "Order item not found" });
+  }
+
+  item.trashedAt = new Date();
+  item.packedQuantity = 0;
+  order.recalculateStatus();
+  await order.save();
+
+  const populated = await populateOrder(Order.findById(order._id));
+  res.json({ message: `${item.productName || "Product"} moved to trash`, order: serializeOrder(populated) });
 }
 
 export async function manuallyPackOrderItem(req, res) {
@@ -279,7 +397,7 @@ export async function manuallyPackOrderItem(req, res) {
   res.json({
     message: populated.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed" : `${item.productName} manually packed`,
     packedItem: { productId: item.productId, hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
-    order: populated
+    order: serializeOrder(populated)
   });
 }
 
@@ -314,7 +432,7 @@ export async function manuallyPackFullOrderItem(req, res) {
   res.json({
     message: populated.packedStatus === "Completed" ? "Order completed" : `${item.productName} full quantity packed`,
     packedItem: { productId: item.productId, hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
-    order: populated
+    order: serializeOrder(populated)
   });
 }
 
@@ -324,10 +442,10 @@ export async function manuallyCompleteOrder(req, res) {
     return res.status(404).json({ message: "Order not found" });
   }
 
-  const changedItems = order.items.filter((item) => (item.packedQuantity || 0) < (item.quantity || 0));
+  const changedItems = getActiveItems(order.items || []).filter((item) => (item.packedQuantity || 0) < (item.quantity || 0));
   if (!changedItems.length) {
     const populated = await populateOrder(Order.findById(order._id));
-    return res.json({ message: "Order already completed", order: populated });
+    return res.json({ message: "Order already completed", order: serializeOrder(populated) });
   }
 
   changedItems.forEach((item) => {
@@ -348,7 +466,7 @@ export async function manuallyCompleteOrder(req, res) {
   const populated = await populateOrder(Order.findById(order._id));
   res.json({
     message: "Order manually completed",
-    order: populated
+    order: serializeOrder(populated)
   });
 }
 
@@ -380,7 +498,7 @@ export async function removePackedOrderItem(req, res) {
   const populated = await populateOrder(Order.findById(order._id));
   res.json({
     message: `${item.productName} removed from packed`,
-    order: populated
+    order: serializeOrder(populated)
   });
 }
 
@@ -406,7 +524,7 @@ export async function removeOnePackedOrderItem(req, res) {
   const populated = await populateOrder(Order.findById(order._id));
   res.json({
     message: `1 packed quantity removed from ${item.productName}`,
-    order: populated
+    order: serializeOrder(populated)
   });
 }
 
@@ -495,7 +613,7 @@ export async function scanBarcode(req, res) {
     const scannedText = normalizeScanText(barcode);
     const product = scannedBarcode ? await Product.findOne({ barcode: barcode.toString().trim() }) : null;
     const item = findOrderItemByScan(order, barcode) || (
-      product ? order.items.find((entry) => String(entry.productId?._id || entry.productId) === String(product._id)) : null
+      product ? getActiveItems(order.items || []).find((entry) => String(entry.productId?._id || entry.productId) === String(product._id)) : null
     );
     if (!item) {
       return res.status(404).json({ message: `Wrong item: ${barcode} is not in this order` });
@@ -523,7 +641,7 @@ export async function scanBarcode(req, res) {
     res.json({
       message: populated.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed" : "Item scanned",
       packedItem: { productId: item.productId?._id || item.productId || product?._id, hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
-      order: populated
+      order: serializeOrder(populated)
     });
   } catch (error) {
     console.error("Scan failed:", error);

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCheck, Edit3, Minus, PackageX, Plus, Save, X } from "lucide-react";
+import { Check, CheckCheck, Edit3, Loader2, Minus, PackageX, Plus, Save, Trash2, X } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 
 function getBarcodeLabel(item) {
@@ -21,10 +21,11 @@ function createDraft(item) {
   };
 }
 
-function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManualPackFull, onRemoveOnePacked, onRemovePacked, onUpdateItem, onError, scanningMode = false }) {
+function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManualPackFull, onRemoveOnePacked, onRemovePacked, onUpdateItem, onDeleteItem, onError, scanningMode = false }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const missing = useMemo(() => items.filter((item) => (item?.packedQuantity || 0) < (item?.quantity || 0)), [items]);
   const visibleItems = useMemo(() => {
     const rows = items.map((item, index) => ({ item, index }));
@@ -107,6 +108,19 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
     }
   }
 
+  async function deleteItem() {
+    if (!deleteTarget) return;
+    try {
+      setBusyAction(`delete-${deleteTarget.index}`);
+      await onDeleteItem(deleteTarget.index);
+      setDeleteTarget(null);
+    } catch (error) {
+      onError?.(error.message);
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
   return (
     <section className="space-y-2.5 sm:space-y-4">
       {!scanningMode && (
@@ -169,6 +183,7 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
                   {!scanningMode && (
+                    <>
                     <button
                       onClick={() => (isEditing ? cancelEditing() : startEditing(index, item))}
                       className="grid h-8 w-8 place-items-center rounded-lg border border-black/10 bg-white text-black/70 sm:h-10 sm:w-10"
@@ -177,6 +192,17 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                     >
                       {isEditing ? <X size={18} /> : <Edit3 size={18} />}
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget({ index, item })}
+                      disabled={busyAction === `delete-${index}`}
+                      className="grid h-8 w-8 place-items-center rounded-lg border border-red-200 bg-white text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 sm:h-10 sm:w-10"
+                      aria-label={`Move ${item.productName || "product"} to trash`}
+                      title="Move product to trash"
+                    >
+                      {busyAction === `delete-${index}` ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                    </button>
+                    </>
                   )}
                   <div className={`grid place-items-center rounded-full ${scanningMode ? "h-7 w-7 sm:h-8 sm:w-8" : "h-8 w-8 sm:h-10 sm:w-10"} ${done ? "bg-emerald-600 text-white" : "bg-black/5 text-black/40 dark:bg-white/10 dark:text-white/50"}`}>
                     {done ? <Check size={scanningMode ? 16 : 20} /> : <PackageX size={scanningMode ? 15 : 18} />}
@@ -311,6 +337,42 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
           );
         })}
       </div>
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-2.5 sm:place-items-center sm:p-3">
+          <section className="w-full max-w-md rounded-lg bg-white p-3 shadow-soft dark:bg-[#151f1a] sm:p-4">
+            <div className="mb-4 flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200">
+                <Trash2 size={18} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-base font-black sm:text-lg">Move product to trash?</h2>
+                <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                  {deleteTarget.item?.productName || "This product"} will be removed from this order and permanently deleted after 24 hours.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                disabled={busyAction === `delete-${deleteTarget.index}`}
+                className="min-h-11 rounded-lg border border-black/10 px-4 py-2 text-sm font-bold dark:border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deleteItem}
+                disabled={busyAction === `delete-${deleteTarget.index}`}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {busyAction === `delete-${deleteTarget.index}` ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                Move
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </section>
   );
 }

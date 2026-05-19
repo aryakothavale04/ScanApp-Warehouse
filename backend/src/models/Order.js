@@ -15,7 +15,8 @@ const orderItemSchema = new mongoose.Schema(
     pricePerUnit: { type: Number, min: 0 },
     totalAmount: { type: Number, min: 0 },
     packedQuantity: { type: Number, default: 0, min: 0 },
-    invoiceLine: { type: String, trim: true }
+    invoiceLine: { type: String, trim: true },
+    trashedAt: { type: Date, index: true }
   },
   { _id: false }
 );
@@ -47,14 +48,16 @@ const orderSchema = new mongoose.Schema(
 );
 
 orderSchema.methods.recalculateStatus = function recalculateStatus() {
-  const complete = this.items.length > 0 && this.items.every((item) => item.packedQuantity >= item.quantity);
+  const activeItems = this.items.filter((item) => !item.trashedAt);
+  const complete = activeItems.length > 0 && activeItems.every((item) => item.packedQuantity >= item.quantity);
   this.packedStatus = complete ? "Completed" : "Pending";
 };
 
 orderSchema.virtual("progress").get(function progress() {
+  const activeItems = this.items.filter((item) => !item.trashedAt);
   return {
-    totalQuantity: this.items.reduce((sum, item) => sum + item.quantity, 0),
-    packedQuantity: this.items.reduce((sum, item) => sum + item.packedQuantity, 0)
+    totalQuantity: activeItems.reduce((sum, item) => sum + item.quantity, 0),
+    packedQuantity: activeItems.reduce((sum, item) => sum + item.packedQuantity, 0)
   };
 });
 
