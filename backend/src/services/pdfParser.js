@@ -1,5 +1,7 @@
 import pdfParse from "pdf-parse/lib/pdf-parse.js";
 
+const VYAPAR_TABLE_COLUMNS = ["#", "Item name", "Item code", "Quantity", "Price/unit", "Amount"];
+
 function normalizePdfText(text = "") {
   return text
     .normalize("NFKC")
@@ -11,10 +13,24 @@ function normalizePdfText(text = "") {
     .replace(/[‘’]/g, "'");
 }
 
+function normalizeTableHeaderLine(line = "") {
+  const normalized = line.toString().trim();
+  const compact = normalized.toLowerCase().replace(/[^a-z#]/g, "");
+  if (
+    compact === "#itemnameitemcodequantitypriceunitamount" ||
+    compact === "itemnameitemcodequantitypriceunitamount"
+  ) {
+    return VYAPAR_TABLE_COLUMNS.join("\t");
+  }
+
+  return normalized;
+}
+
 function cleanLines(text) {
   return normalizePdfText(text || "")
     .split(/\r?\n/)
     .map((line) => line.replace(/[^\S\t]+/g, " ").replace(/\t+/g, "\t").trim())
+    .map(normalizeTableHeaderLine)
     .filter(Boolean);
 }
 
@@ -143,6 +159,48 @@ function extractSummaryFields(lines) {
     currentBalance: findAmountAfterLabel(lines, ["current\\s*balance"]),
     paymentType,
     paidAmount: findAmountAfterLabel(lines, ["paid", "received", "payment"])
+  };
+}
+
+function calculateInvoiceTotals(items = [], summary = {}) {
+  const itemsTotal = Number(items.reduce((sum, item) => sum + (item?.totalAmount || 0), 0).toFixed(2));
+  const totalBeforeRoundOff = summary.subtotal ?? itemsTotal;
+  const roundOff = Number.isFinite(summary.roundOff) ? summary.roundOff : 0;
+  const totalAfterRoundOff = Number((totalBeforeRoundOff + roundOff).toFixed(2));
+  const total = summary.total ?? totalAfterRoundOff;
+
+  return {
+    itemsTotal,
+    totalBeforeRoundOff,
+    totalAfterRoundOff,
+    total,
+    totalMatchesAfterRoundOff: Math.abs(totalAfterRoundOff - total) < 0.01
+  };
+}
+
+function buildParserDiagnostics(items = []) {
+  const serials = items.map((item) => item?.serialNo).filter(Number.isFinite);
+  const highestSerial = serials.length ? Math.max(...serials) : 0;
+  const missingSerials = [];
+  for (let serialNo = 1; serialNo <= highestSerial; serialNo += 1) {
+    if (!serials.includes(serialNo)) missingSerials.push(serialNo);
+  }
+
+  const duplicateSerials = serials.filter((serialNo, index) => serials.indexOf(serialNo) !== index);
+  const fallbackRows = items
+    .filter((item) => !item?.itemName || !item?.quantity || !item?.pricePerUnit || !item?.totalAmount)
+    .map((item) => item?.serialNo)
+    .filter(Number.isFinite);
+
+  return {
+    itemCount: items.length,
+    firstSerial: serials[0] ?? null,
+    lastSerial: serials.at(-1) ?? null,
+    highestSerial,
+    missingSerials,
+    duplicateSerials,
+    fallbackRows,
+    rowOrderPreserved: serials.every((serialNo, index) => index === 0 || serialNo >= serials[index - 1])
   };
 }
 
@@ -568,8 +626,14 @@ function splitSerialPrefix(line, expectedSerial) {
 
   if (Number.isInteger(expectedSerial) && expectedSerial > 0) {
     const expectedText = expectedSerial.toString();
-    if (line.startsWith(expectedText) && line.length > expectedText.length) {
+    const nextCharacter = line.charAt(expectedText.length);
+    if (line.startsWith(expectedText) && line.length > expectedText.length && !/\s/.test(nextCharacter) && (!/\d/.test(nextCharacter) || expectedText.length > 1)) {
       return { serialNo: expectedSerial, rest: line.slice(expectedText.length).trim() };
+    }
+
+    const rest = line.slice(expectedText.length).trim();
+    if (line.startsWith(expectedText) && /^(?:Rs|INR)\b/i.test(rest)) {
+      return { serialNo: expectedSerial, rest };
     }
   }
 
@@ -577,6 +641,11 @@ function splitSerialPrefix(line, expectedSerial) {
     const firstCompact = line.match(/^1(?![\d\s])(.+)$/);
     if (firstCompact) {
       return { serialNo: 1, rest: firstCompact[1].trim() };
+    }
+
+    const firstCurrencyCompact = line.match(/^1\s+((?:Rs|INR)\b.+)$/i);
+    if (firstCurrencyCompact) {
+      return { serialNo: 1, rest: firstCurrencyCompact[1].trim() };
     }
   }
 
@@ -755,6 +824,15 @@ function parseStrictAmountDetail(line = "") {
   };
 }
 
+function getStrictAmountDetail(line = "", cache) {
+  if (!cache) return parseStrictAmountDetail(line);
+  if (cache.has(line)) return cache.get(line);
+
+  const detail = parseStrictAmountDetail(line);
+  cache.set(line, detail);
+  return detail;
+}
+
 function isLikelyItemNameContinuation(line = "") {
   const restored = restoreDisplayCurrency(line);
   return !hasLatin(restored) || /(?:₹|Rs)\s*\d+\s*[x×]\s*\d+/i.test(restored) || /\d+\s*[x×]\s*\d+\s*(?:pic|pcs?)?$/i.test(restored);
@@ -778,9 +856,9 @@ function pickStrictItemNameParts(parts, detailIndex) {
   return itemNameParts;
 }
 
-function parseStrictRowGroup(group) {
+function parseStrictRowGroup(group, detailCache) {
   const parts = group.parts || [];
-  const detailIndex = parts.findIndex((part) => parseStrictAmountDetail(part));
+  const detailIndex = parts.findIndex((part) => getStrictAmountDetail(part, detailCache));
   if (detailIndex < 0) {
     return makeStrictItem({
       serialNo: group.serialNo,
@@ -788,7 +866,7 @@ function parseStrictRowGroup(group) {
     });
   }
 
-  const detail = parseStrictAmountDetail(parts[detailIndex]);
+  const detail = getStrictAmountDetail(parts[detailIndex], detailCache);
   const itemNameParts = pickStrictItemNameParts(parts, detailIndex);
   const itemName = itemNameParts.length
     ? itemNameParts.join(" ")
@@ -882,24 +960,29 @@ function parseSeparatedVyaparRows(lines) {
   const section = getItemSectionLines(lines);
   const rows = [];
   const rowGroups = [];
+  const detailCache = new Map();
   let current = null;
   let expectedSerial = null;
 
   for (const line of section) {
     if (/^invoice$/i.test(line) || isItemTableHeaderLine(line)) continue;
 
-    const currentHasDetail = current?.parts?.some((part) => parseStrictAmountDetail(part));
-    if (current && !currentHasDetail && parseStrictAmountDetail(line)) {
+    const lineDetail = getStrictAmountDetail(line, detailCache);
+    if (current && !current.hasDetail && lineDetail) {
       current.parts.push(line);
+      current.hasDetail = true;
       continue;
     }
 
     const serialPrefix = splitSerialPrefix(line, expectedSerial);
     if (serialPrefix) {
       if (current) rowGroups.push(current);
-      current = { serialNo: serialPrefix.serialNo, parts: [] };
+      current = { serialNo: serialPrefix.serialNo, parts: [], hasDetail: false };
       expectedSerial = serialPrefix.serialNo + 1;
-      if (serialPrefix.rest) current.parts.push(serialPrefix.rest);
+      if (serialPrefix.rest) {
+        current.parts.push(serialPrefix.rest);
+        current.hasDetail = Boolean(getStrictAmountDetail(serialPrefix.rest, detailCache));
+      }
       continue;
     }
 
@@ -910,7 +993,7 @@ function parseSeparatedVyaparRows(lines) {
 
   for (const group of rowGroups) {
     try {
-      rows.push(parseStrictRowGroup(group));
+      rows.push(parseStrictRowGroup(group, detailCache));
     } catch (error) {
       console.warn("Malformed strict invoice row preserved with fallbacks:", {
         serialNo: group?.serialNo,
@@ -1088,16 +1171,23 @@ export async function parseVyaparInvoice(buffer) {
     }
 
     const summary = extractSummaryFields(lines);
-    const itemsTotal = Number(items.reduce((sum, item) => sum + (item.totalAmount || 0), 0).toFixed(2));
+    const totals = calculateInvoiceTotals(items, summary);
+    const parserDiagnostics = buildParserDiagnostics(items);
 
     return {
       invoiceNo: extractInvoiceNo(lines),
       date: extractDate(lines),
       customerName: extractCustomerName(lines),
       contact: extractContact(lines),
+      tableColumns: [...VYAPAR_TABLE_COLUMNS],
       items,
-      subtotal: summary.subtotal ?? itemsTotal,
-      total: summary.total ?? summary.subtotal ?? itemsTotal,
+      itemsTotal: totals.itemsTotal,
+      subtotal: totals.totalBeforeRoundOff,
+      totalBeforeRoundOff: totals.totalBeforeRoundOff,
+      totalAfterRoundOff: totals.totalAfterRoundOff,
+      total: totals.total,
+      totalMatchesAfterRoundOff: totals.totalMatchesAfterRoundOff,
+      parserDiagnostics,
       roundOff: summary.roundOff,
       balance: summary.balance ?? 0,
       previousBalance: summary.previousBalance,
@@ -1117,5 +1207,8 @@ export const pdfParserInternals = {
   parseAmountTail,
   splitTrailingInferredQuantity,
   isolateMultilingualName,
+  calculateInvoiceTotals,
+  buildParserDiagnostics,
+  normalizeTableHeaderLine,
   renderPageWithColumns
 };

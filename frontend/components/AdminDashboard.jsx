@@ -2,7 +2,7 @@
 
 import { Boxes, CheckCircle2, TimerReset, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, clearStoredAccessCode } from "@/src/lib/api";
 import OrderCard from "./OrderCard";
 import StoreBrand from "./StoreBrand";
@@ -29,9 +29,20 @@ export default function AdminDashboard() {
     }
   }
 
-  function removeOrder(orderId) {
-    setOrders((currentOrders) => currentOrders.filter((order) => order._id !== orderId));
-  }
+  const deleteOrder = useCallback((orderToDelete) => {
+    const previousOrders = orders;
+    const previousTrash = trashedOrders;
+
+    setOrders((currentOrders) => currentOrders.filter((order) => order._id !== orderToDelete._id));
+    setTrashedOrders((currentTrash) => [{ ...orderToDelete, deletedAt: new Date().toISOString() }, ...currentTrash]);
+    setToast({ type: "success", message: "Order moved to trash" });
+
+    api.deleteOrder(orderToDelete._id).catch(() => {
+      setOrders(previousOrders);
+      setTrashedOrders(previousTrash);
+      setToast({ type: "error", message: "Sync failed. Please retry." });
+    });
+  }, [orders, trashedOrders]);
 
   function logout() {
     clearStoredAccessCode();
@@ -152,7 +163,7 @@ export default function AdminDashboard() {
             ) : (
               <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
                 {stats.pendingOrders.map((order) => (
-                  <OrderCard key={order._id} order={order} onDeleted={removeOrder} onToast={setToast} compact />
+                  <OrderCard key={order._id} order={order} onDelete={deleteOrder} compact />
                 ))}
                 {!stats.pendingOrders.length && (
                   <div className="rounded-lg bg-white p-6 text-center text-sm text-black/55 dark:bg-[#151f1a] dark:text-white/55">
@@ -170,7 +181,7 @@ export default function AdminDashboard() {
           {loading ? null : (
             <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 lg:grid-cols-3">
               {stats.completedOrders.map((order) => (
-                <OrderCard key={order._id} order={order} onDeleted={removeOrder} onToast={setToast} compact />
+                <OrderCard key={order._id} order={order} onDelete={deleteOrder} compact />
               ))}
               {!stats.completedOrders.length && (
                 <div className="rounded-lg bg-white p-6 text-center text-sm text-black/55 dark:bg-[#151f1a] dark:text-white/55">

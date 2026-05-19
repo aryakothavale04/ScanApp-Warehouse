@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { extractItems, pdfParserInternals } from "../src/services/pdfParser.js";
 
-const { isolateMultilingualName, parseVyaparRow } = pdfParserInternals;
+const {
+  buildParserDiagnostics,
+  calculateInvoiceTotals,
+  isolateMultilingualName,
+  normalizeTableHeaderLine,
+  parseVyaparRow
+} = pdfParserInternals;
 
 describe("pdf parser", () => {
   it("removes trailing inferred quantity from product name when no barcode is present", () => {
@@ -113,6 +119,39 @@ describe("pdf parser", () => {
   it("normalizes compact merged headers", () => {
     assert.equal(isolateMultilingualName("SA जाम पाट 5 Jam Party4", 4).productName, "Jam Party");
   });
+
+  it("separates compact Vyapar table headers into canonical columns", () => {
+    assert.deepEqual(
+      normalizeTableHeaderLine("#Item nameItem codeQuantityPrice/ unitAmount").split("\t"),
+      ["#", "Item name", "Item code", "Quantity", "Price/unit", "Amount"]
+    );
+  });
+
+  it("compares final totals after applying round-off", () => {
+    const totals = calculateInvoiceTotals(
+      [{ totalAmount: 29138.4 }],
+      { subtotal: 29138.4, roundOff: -0.4, total: 29138 }
+    );
+
+    assert.equal(totals.itemsTotal, 29138.4);
+    assert.equal(totals.totalBeforeRoundOff, 29138.4);
+    assert.equal(totals.totalAfterRoundOff, 29138);
+    assert.equal(totals.totalMatchesAfterRoundOff, true);
+  });
+
+  it("reports parser diagnostics for row safety checks", () => {
+    const diagnostics = buildParserDiagnostics([
+      { serialNo: 1, itemName: "A", quantity: 1, pricePerUnit: 10, totalAmount: 10 },
+      { serialNo: 3, itemName: "", quantity: 0, pricePerUnit: 0, totalAmount: 0 },
+      { serialNo: 3, itemName: "C", quantity: 1, pricePerUnit: 20, totalAmount: 20 }
+    ]);
+
+    assert.deepEqual(diagnostics.missingSerials, [2]);
+    assert.deepEqual(diagnostics.duplicateSerials, [3]);
+    assert.deepEqual(diagnostics.fallbackRows, [3]);
+    assert.equal(diagnostics.rowOrderPreserved, true);
+  });
+
   it("extracts serial/native/detail rows from machine-readable Vyapar text", () => {
     const items = extractItems([
       "#Item nameItem codeQuantityPrice/ unitAmount",
@@ -216,6 +255,84 @@ describe("pdf parser", () => {
       [
         { serialNo: 1, productName: "Sobisco Choco Fill 30/-", hsnOrBarcode: "8902351111126", quantity: 30, totalAmount: 750 },
         { serialNo: 2, productName: "सोबीस्को मिल्क 5/-", hsnOrBarcode: "8902351998871", quantity: 6, totalAmount: 312 }
+      ]
+    );
+  });
+
+  it("extracts a compact first row when the item name starts with a currency marker", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "1 Rs 60 Matka Kulfi 100ml10 Rs 408 Rs 4080",
+      "2",
+      "Vanilla Bulk",
+      "Vanilla Bulk5 Rs 470 Rs 2350",
+      "Total15 Rs 6430"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 1, productName: "₹60 Matka Kulfi 100ml", quantity: 10, pricePerUnit: 408, totalAmount: 4080 },
+        { serialNo: 2, productName: "Vanilla Bulk", quantity: 5, pricePerUnit: 470, totalAmount: 2350 }
+      ]
+    );
+  });
+
+  it("does not split an item name that starts with the next serial digit", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "6",
+      "750ml थम्स अप Rs 35",
+      "Thums Up 600 ml0.5 Rs 780 Rs 390",
+      "7",
+      "750ml स्प्राईट Rs 35",
+      "Sprite 600ml0.5 Rs 780 Rs 390",
+      "Total1 Rs 780"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        quantity: item.quantity,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 6, productName: "750ml थम्स अप ₹35", quantity: 0.5, totalAmount: 390 },
+        { serialNo: 7, productName: "750ml स्प्राईट ₹35", quantity: 0.5, totalAmount: 390 }
+      ]
+    );
+  });
+
+  it("extracts expected serial rows glued to currency-led item names", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "12",
+      "Rs 5 Lays Hot and Sweet240 Rs 3.92 Rs 940",
+      "13 Rs 5 Lays Mini Stix24 Rs 47 Rs 1128",
+      "14",
+      "Rs 5 Kurkure Masala Munch24 Rs 47 Rs 1128",
+      "Total288 Rs 3196"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 12, productName: "₹5 Lays Hot and Sweet", quantity: 240, pricePerUnit: 3.92, totalAmount: 940 },
+        { serialNo: 13, productName: "₹5 Lays Mini Stix", quantity: 24, pricePerUnit: 47, totalAmount: 1128 },
+        { serialNo: 14, productName: "₹5 Kurkure Masala Munch", quantity: 24, pricePerUnit: 47, totalAmount: 1128 }
       ]
     );
   });

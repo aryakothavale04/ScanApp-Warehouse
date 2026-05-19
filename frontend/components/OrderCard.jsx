@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, ClipboardList, Loader2, PackageCheck, Trash2 } from "lucide-react";
-import { useState } from "react";
-import { api } from "@/src/lib/api";
+import { CheckCircle2, ClipboardList, PackageCheck, Trash2 } from "lucide-react";
+import { memo, useState } from "react";
 import ProgressRing from "./ProgressRing";
 
-export default function OrderCard({ order, onDeleted, onToast, compact = false }) {
-  const [deleting, setDeleting] = useState(false);
+function OrderCard({ order, onDelete, compact = false }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const totals = order.progress || {
     totalQuantity: order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0,
@@ -17,18 +15,9 @@ export default function OrderCard({ order, onDeleted, onToast, compact = false }
   const statusLabel = completed ? "Completed" : order.packedStatus;
   const percent = totals.totalQuantity ? Math.min(100, Math.round((totals.packedQuantity / totals.totalQuantity) * 100)) : 0;
 
-  async function handleDelete() {
-    setDeleting(true);
-    try {
-      await api.deleteOrder(order._id);
-      onToast?.({ type: "success", message: "Order moved to trash" });
-      onDeleted?.(order._id);
-    } catch (error) {
-      onToast?.({ type: "error", message: error.message });
-    } finally {
-      setDeleting(false);
-      setDeleteOpen(false);
-    }
+  function handleDelete() {
+    setDeleteOpen(false);
+    onDelete?.(order);
   }
 
   return (
@@ -81,12 +70,11 @@ export default function OrderCard({ order, onDeleted, onToast, compact = false }
         <button
           type="button"
           onClick={() => setDeleteOpen(true)}
-          disabled={deleting}
-          className={`${compact ? "grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40" : "mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"}`}
+          className={`${compact ? "grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40" : "mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"}`}
           aria-label={`Move invoice ${order.invoiceNo} to trash`}
           title="Move to trash"
         >
-          {deleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+          <Trash2 size={16} />
           {!compact && "Move to Trash"}
         </button>
         </div>
@@ -111,7 +99,6 @@ export default function OrderCard({ order, onDeleted, onToast, compact = false }
               <button
                 type="button"
                 onClick={() => setDeleteOpen(false)}
-                disabled={deleting}
                 className="min-h-11 rounded-lg border border-black/10 px-4 py-2 text-sm font-bold dark:border-white/10"
               >
                 Cancel
@@ -119,10 +106,9 @@ export default function OrderCard({ order, onDeleted, onToast, compact = false }
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={deleting}
-                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white"
               >
-                {deleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+                <Trash2 size={16} />
                 Move
               </button>
             </div>
@@ -132,3 +118,5 @@ export default function OrderCard({ order, onDeleted, onToast, compact = false }
     </>
   );
 }
+
+export default memo(OrderCard);

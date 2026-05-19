@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, CheckCheck, Edit3, Minus, PackageX, Plus, Save, X } from "lucide-react";
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 
 function getBarcodeLabel(item) {
   const barcode = item.productId?.barcode || item.hsnOrBarcode;
@@ -21,21 +21,21 @@ function createDraft(item) {
   };
 }
 
-export default function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManualPackFull, onRemoveOnePacked, onRemovePacked, onUpdateItem, onError, scanningMode = false }) {
+function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManualPackFull, onRemoveOnePacked, onRemovePacked, onUpdateItem, onError, scanningMode = false }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
-  const missing = items.filter((item) => (item?.packedQuantity || 0) < (item?.quantity || 0));
-  const visibleItems = scanningMode
-    ? items
-      .map((item, index) => ({ item, index }))
-      .sort((left, right) => {
-        const leftDone = (left.item?.packedQuantity || 0) >= (left.item?.quantity || 0);
-        const rightDone = (right.item?.packedQuantity || 0) >= (right.item?.quantity || 0);
-        if (leftDone === rightDone) return left.index - right.index;
-        return leftDone ? 1 : -1;
-      })
-    : items.map((item, index) => ({ item, index }));
+  const missing = useMemo(() => items.filter((item) => (item?.packedQuantity || 0) < (item?.quantity || 0)), [items]);
+  const visibleItems = useMemo(() => {
+    const rows = items.map((item, index) => ({ item, index }));
+    if (!scanningMode) return rows;
+    return rows.sort((left, right) => {
+      const leftDone = (left.item?.packedQuantity || 0) >= (left.item?.quantity || 0);
+      const rightDone = (right.item?.packedQuantity || 0) >= (right.item?.quantity || 0);
+      if (leftDone === rightDone) return left.index - right.index;
+      return leftDone ? 1 : -1;
+    });
+  }, [items, scanningMode]);
 
   function startEditing(index, item) {
     setEditingIndex(index);
@@ -314,3 +314,5 @@ export default function PackingChecklist({ items = [], lastPackedItemId, onManua
     </section>
   );
 }
+
+export default memo(PackingChecklist);
