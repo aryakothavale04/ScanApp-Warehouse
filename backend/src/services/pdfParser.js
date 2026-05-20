@@ -641,12 +641,21 @@ function splitSerialPrefix(line, expectedSerial) {
     }
 
     const rest = restAfterExpected.trim();
+    if (line.startsWith(expectedText) && /\d/.test(nextCharacter) && getStrictAmountDetail(rest)) {
+      return { serialNo: expectedSerial, rest };
+    }
+
     if (line.startsWith(expectedText) && /^(?:Rs|INR)\b/i.test(rest)) {
       return { serialNo: expectedSerial, rest };
     }
   }
 
   if (!Number.isInteger(expectedSerial)) {
+    const firstPriceLedCompact = line.match(/^1(?=\d+\s*\/-)(.+)$/);
+    if (firstPriceLedCompact && getStrictAmountDetail(firstPriceLedCompact[1].trim())) {
+      return { serialNo: 1, rest: firstPriceLedCompact[1].trim() };
+    }
+
     const firstCompact = line.match(/^1(?![\d\s])(.+)$/);
     if (firstCompact) {
       return { serialNo: 1, rest: firstCompact[1].trim() };
@@ -801,6 +810,37 @@ function parseStrictAmountDetail(line = "") {
       totalAmount,
       codeColumnText: beforePrice.slice(0, barcodeQuantityMatch.index).trim()
     };
+  }
+
+  const compactCurrencyDecimalQuantity = beforePrice.match(/(?:â‚¹|Rs|INR)\s*(\d{1,5}\.\d+)$/i);
+  if (compactCurrencyDecimalQuantity) {
+    const compactNumber = compactCurrencyDecimalQuantity[1];
+    const decimalIndex = compactNumber.indexOf(".");
+    const candidates = [];
+    for (let packLength = 1; packLength < decimalIndex; packLength += 1) {
+      const packPrice = compactNumber.slice(0, packLength);
+      const quantity = toNumber(compactNumber.slice(packLength));
+      if (!Number.isFinite(quantity) || quantity <= 0) continue;
+      candidates.push({
+        packPrice,
+        quantity,
+        difference: Math.abs((quantity * pricePerUnit) - totalAmount)
+      });
+    }
+
+    const selected = candidates
+      .filter((candidate) => candidate.difference <= Math.max(1.25, pricePerUnit * 0.35))
+      .sort((left, right) => left.difference - right.difference || right.packPrice.length - left.packPrice.length)[0];
+
+    if (selected) {
+      return {
+        barcode: "",
+        quantity: selected.quantity,
+        pricePerUnit,
+        totalAmount,
+        codeColumnText: `${beforePrice.slice(0, compactCurrencyDecimalQuantity.index)}â‚¹${selected.packPrice}`.trim()
+      };
+    }
   }
 
   const trailingDecimalQuantityMatch = beforePrice.match(/(\d+\.\d+)$/);

@@ -459,6 +459,32 @@ describe("pdf parser", () => {
     );
   });
 
+  it("preserves compact rows when serials are glued to digit-led product names", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "11/- \u091f\u093e\u0907\u092e\u092a\u093e\u0938Timepass Rs 12 Rs 52 Rs 104",
+      "2Rs 10 \u091c\u0940\u0930\u093e \u0938\u094b\u0921\u093eJeera Soda 10/-1 Rs 170 Rs 170",
+      "3Rs 10 \u092e\u0901\u0917\u094bMango 10/-2 Rs 170 Rs 340",
+      "4Rs 10 \u0938\u094d\u092a\u094d\u0930\u093e\u0908\u091fSprite 10/-2 Rs 170 Rs 340",
+      "5250ml \u0925\u092e\u094d\u0938 \u0905\u092a Rs 20Thums Ups 250ml1 Rs 500 Rs 500",
+      "6250ml \u0938\u094d\u092a\u094d\u0930\u093e\u0908\u091f Rs 20Sprite 250ml1 Rs 500 Rs 500",
+      "7250ml \u092e\u093e\u091d\u093e Rs 20Maza Rs 200.5 Rs 540 Rs 270",
+      "8750ml \u0938\u094d\u092a\u094d\u0930\u093e\u0908\u091f Rs 35Sprite 600ml1 Rs 780 Rs 780",
+      "9\u0911\u0932\u0935\u0940\u0928 \u0921\u093e\u0930\u094d\u0915 1/-Allwin Dark1 Rs 100 Rs 100",
+      "10\u091a\u093f\u0902\u091f\u0942 \u0938\u094d\u091f\u094d\u0930\u093e\u092c\u0947\u0930\u0940 \u091c\u093e\u0930Chintu strawberry jar1 Rs 110 Rs 110",
+      "11\u0938\u0947\u0902\u091f\u0930 \u092b\u094d\u0930\u0941\u091fCenter fruit1 Rs 190 Rs 190",
+      "12LD \u00bc kg1 Rs 210 Rs 210",
+      "13LD 1kg1 Rs 210 Rs 210",
+      "14\u0938\u094d\u0915\u094d\u0930\u092c\u0930 10/-Scruber 10/-1 Rs 50 Rs 50",
+      "Total16.5 Rs 3,874"
+    ]);
+
+    assert.deepEqual(items.map((item) => item.serialNo), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+    assert.deepEqual(items.map((item) => item.quantity), [2, 1, 2, 2, 1, 1, 0.5, 1, 1, 1, 1, 1, 1, 1]);
+    assert.equal(items[0].productName, "1/- \u091f\u093e\u0907\u092e\u092a\u093e\u0938Timepass");
+    assert.equal(items[4].productName, "250ml \u0925\u092e\u094d\u0938 \u0905\u092a \u20b920Thums Ups 250ml");
+  });
+
   it("keeps multi-line item details and glued serial rows in order", () => {
     const items = extractItems([
       "#Item nameItem codeQuantityPrice/ unitAmount",
