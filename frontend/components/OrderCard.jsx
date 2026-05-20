@@ -5,7 +5,7 @@ import { CheckCircle2, ClipboardList, Loader2, MoveDown, MoveUp, PackageCheck, T
 import { memo, useState } from "react";
 import ProgressRing from "./ProgressRing";
 
-function OrderCard({ order, onDelete, compact = false, sequenceNumber, sequenceControls = false, onMoveUp, onMoveDown, canMoveUp = false, canMoveDown = false, moving = false }) {
+function OrderCard({ order, onDelete, compact = false, sequenceNumber, onSequenceClick, sequenceControls = false, onMoveUp, onMoveDown, canMoveUp = false, canMoveDown = false, moving = false }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const totals = order.progress || {
@@ -37,7 +37,25 @@ function OrderCard({ order, onDelete, compact = false, sequenceNumber, sequenceC
             <div className="min-w-0 flex-1">
               <div className="mb-0.5 flex items-center gap-1.5">
                 {sequenceNumber ? (
-                  <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-md bg-leaf/10 px-1.5 text-[11px] font-black leading-none text-leaf dark:bg-leaf/20">
+                  <span
+                    role={onSequenceClick ? "button" : undefined}
+                    tabIndex={onSequenceClick ? 0 : undefined}
+                    onClick={(event) => {
+                      if (!onSequenceClick) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSequenceClick(order);
+                    }}
+                    onKeyDown={(event) => {
+                      if (!onSequenceClick || (event.key !== "Enter" && event.key !== " ")) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onSequenceClick(order);
+                    }}
+                    className={`grid h-5 min-w-5 shrink-0 place-items-center rounded-md bg-leaf/10 px-1.5 text-[11px] font-black leading-none text-leaf dark:bg-leaf/20 ${onSequenceClick ? "cursor-pointer ring-offset-2 transition hover:bg-leaf/20 focus:outline-none focus:ring-2 focus:ring-leaf dark:ring-offset-[#151f1a]" : ""}`}
+                    title={onSequenceClick ? "Change sequence number" : undefined}
+                    aria-label={onSequenceClick ? `Change sequence number for invoice ${order.invoiceNo}` : undefined}
+                  >
                     {sequenceNumber}
                   </span>
                 ) : null}

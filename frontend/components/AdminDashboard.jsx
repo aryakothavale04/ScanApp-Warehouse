@@ -15,6 +15,9 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [sequenceMode, setSequenceMode] = useState(false);
   const [movingOrderId, setMovingOrderId] = useState(null);
+  const [sequenceTarget, setSequenceTarget] = useState(null);
+  const [sequenceDraft, setSequenceDraft] = useState("");
+  const [sequenceSaving, setSequenceSaving] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -76,6 +79,67 @@ export default function AdminDashboard() {
       loadOrders();
     } finally {
       setMovingOrderId(null);
+    }
+  }
+
+  async function moveOrderToSequence(orderToMove, targetSequence, groupOrders = stats.pendingOrders) {
+    const targetIndex = Number.parseInt(targetSequence, 10) - 1;
+    const currentGroupIndex = groupOrders.findIndex((order) => order._id === orderToMove._id);
+
+    if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= groupOrders.length) {
+      setToast({ type: "error", message: `Enter a sequence number between 1 and ${groupOrders.length}` });
+      return false;
+    }
+
+    if (currentGroupIndex < 0) return false;
+    if (currentGroupIndex === targetIndex) return true;
+
+    const reorderedGroupIds = groupOrders.map((order) => order._id);
+    const [movedId] = reorderedGroupIds.splice(currentGroupIndex, 1);
+    reorderedGroupIds.splice(targetIndex, 0, movedId);
+
+    const groupIdSet = new Set(reorderedGroupIds);
+    let nextGroupIndex = 0;
+    const nextOrders = orders.map((order) => {
+      if (!groupIdSet.has(order._id)) return order;
+      const nextId = reorderedGroupIds[nextGroupIndex];
+      nextGroupIndex += 1;
+      return orders.find((entry) => entry._id === nextId) || order;
+    });
+
+    setOrders(nextOrders);
+    setMovingOrderId(orderToMove._id);
+
+    try {
+      const data = await api.updateOrderSequence(nextOrders.map((order) => order._id));
+      setOrders(data.orders || nextOrders);
+      setToast({ type: "success", message: "Order sequence updated" });
+      return true;
+    } catch (error) {
+      setToast({ type: "error", message: error.message });
+      loadOrders();
+      return false;
+    } finally {
+      setMovingOrderId(null);
+    }
+  }
+
+  function openSequenceEditor(order, sequenceNumber) {
+    setSequenceTarget(order);
+    setSequenceDraft(String(sequenceNumber));
+  }
+
+  async function submitSequenceChange(event) {
+    event.preventDefault();
+    if (!sequenceTarget || sequenceSaving) return;
+
+    setSequenceSaving(true);
+    const moved = await moveOrderToSequence(sequenceTarget, sequenceDraft);
+    setSequenceSaving(false);
+
+    if (moved) {
+      setSequenceTarget(null);
+      setSequenceDraft("");
     }
   }
 
@@ -209,6 +273,7 @@ export default function AdminDashboard() {
                     onDelete={deleteOrder}
                     compact
                     sequenceNumber={index + 1}
+                    onSequenceClick={(entry) => openSequenceEditor(entry, index + 1)}
                     sequenceControls={sequenceMode}
                     onMoveUp={(entry) => moveOrder(entry, "up")}
                     onMoveDown={(entry) => moveOrder(entry, "down")}
@@ -291,6 +356,52 @@ export default function AdminDashboard() {
               </button>
             </div>
           </section>
+        </div>
+      )}
+      {sequenceTarget && (
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-3 sm:place-items-center">
+          <form onSubmit={submitSequenceChange} className="w-full max-w-md rounded-lg bg-white p-4 shadow-soft dark:bg-[#151f1a]">
+            <div className="mb-4">
+              <h2 className="text-lg font-black">Change Sequence</h2>
+              <p className="mt-1 text-sm text-black/60 dark:text-white/60">
+                Move invoice <span className="font-bold text-black dark:text-white">{sequenceTarget.invoiceNo}</span> to sequence number.
+              </p>
+            </div>
+            <label className="mb-4 block">
+              <span className="mb-1 block text-xs font-bold uppercase text-black/50 dark:text-white/50">Sequence No</span>
+              <input
+                type="number"
+                min="1"
+                max={stats.pendingOrders.length}
+                step="1"
+                autoFocus
+                value={sequenceDraft}
+                onChange={(event) => setSequenceDraft(event.target.value)}
+                className="w-full rounded-lg border border-black/10 bg-white px-3 py-3 text-base font-bold outline-none focus:border-leaf dark:border-white/10 dark:bg-[#101712]"
+              />
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSequenceTarget(null);
+                  setSequenceDraft("");
+                }}
+                disabled={sequenceSaving}
+                className="min-h-11 rounded-lg border border-black/10 px-4 py-2 text-sm font-bold dark:border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={sequenceSaving}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {sequenceSaving ? <Loader2 className="animate-spin" size={16} /> : <ListOrdered size={16} />}
+                Change
+              </button>
+            </div>
+          </form>
         </div>
       )}
     </main>
