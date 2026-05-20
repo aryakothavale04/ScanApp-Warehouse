@@ -37,8 +37,8 @@ function OrderCard({ order, onDelete, compact = false, sequenceNumber, sequenceC
             <div className="min-w-0 flex-1">
               <div className="mb-0.5 flex items-center gap-1.5">
                 {sequenceNumber ? (
-                  <span className="shrink-0 rounded-md bg-leaf/10 px-1.5 py-0.5 text-[10px] font-black text-leaf dark:bg-leaf/20">
-                    No. {sequenceNumber}
+                  <span className="grid h-5 min-w-5 shrink-0 place-items-center rounded-md bg-leaf/10 px-1.5 text-[11px] font-black leading-none text-leaf dark:bg-leaf/20">
+                    {sequenceNumber}
                   </span>
                 ) : null}
                 {!compact && <p className="text-xs uppercase tracking-wide text-black/45 dark:text-white/45">Invoice</p>}
