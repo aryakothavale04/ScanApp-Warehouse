@@ -71,12 +71,18 @@ export default function PendingDetailsPage() {
             {stats.pendingOrders.map((order) => {
               const pendingItems = getPendingItems(order);
               const pendingQuantity = pendingItems.reduce((sum, item) => sum + item.pendingQuantity, 0);
+              const sequenceNumber = orders.findIndex((entry) => entry._id === order._id) + 1;
 
               return (
                 <section key={order._id} className="rounded-lg bg-white p-3 shadow-sm dark:bg-[#151f1a]">
                   <div className="mb-3 grid gap-2 sm:flex sm:items-center sm:justify-between">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs uppercase tracking-wide text-black/45 dark:text-white/45">Invoice</p>
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <span className="shrink-0 rounded-md bg-leaf/10 px-1.5 py-0.5 text-[10px] font-black text-leaf dark:bg-leaf/20">
+                          No. {sequenceNumber}
+                        </span>
+                        <p className="text-xs uppercase tracking-wide text-black/45 dark:text-white/45">Invoice</p>
+                      </div>
                       <h2 className="truncate text-base font-black">{order.invoiceNo}</h2>
                       <p className="truncate text-sm text-black/60 dark:text-white/60">{order.customerName}</p>
                     </div>

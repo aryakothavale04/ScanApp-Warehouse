@@ -208,6 +208,7 @@ export default function AdminDashboard() {
                     order={order}
                     onDelete={deleteOrder}
                     compact
+                    sequenceNumber={orders.findIndex((entry) => entry._id === order._id) + 1}
                     sequenceControls={sequenceMode}
                     onMoveUp={(entry) => moveOrder(entry, "up")}
                     onMoveDown={(entry) => moveOrder(entry, "down")}
@@ -238,6 +239,7 @@ export default function AdminDashboard() {
                   order={order}
                   onDelete={deleteOrder}
                   compact
+                  sequenceNumber={orders.findIndex((entry) => entry._id === order._id) + 1}
                   sequenceControls={sequenceMode}
                   onMoveUp={(entry) => moveOrder(entry, "up")}
                   onMoveDown={(entry) => moveOrder(entry, "down")}

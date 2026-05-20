@@ -5,7 +5,7 @@ import { CheckCircle2, ClipboardList, Loader2, MoveDown, MoveUp, PackageCheck, T
 import { memo, useState } from "react";
 import ProgressRing from "./ProgressRing";
 
-function OrderCard({ order, onDelete, compact = false, sequenceControls = false, onMoveUp, onMoveDown, canMoveUp = false, canMoveDown = false, moving = false }) {
+function OrderCard({ order, onDelete, compact = false, sequenceNumber, sequenceControls = false, onMoveUp, onMoveDown, canMoveUp = false, canMoveDown = false, moving = false }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const totals = order.progress || {
@@ -35,7 +35,14 @@ function OrderCard({ order, onDelete, compact = false, sequenceControls = false,
         <Link href={`/orders/${order._id}`} className="block min-w-0 flex-1">
           <div className={`flex items-start justify-between gap-2 sm:gap-3 ${compact ? "mb-2" : "mb-4"}`}>
             <div className="min-w-0 flex-1">
-              {!compact && <p className="text-xs uppercase tracking-wide text-black/45 dark:text-white/45">Invoice</p>}
+              <div className="mb-0.5 flex items-center gap-1.5">
+                {sequenceNumber ? (
+                  <span className="shrink-0 rounded-md bg-leaf/10 px-1.5 py-0.5 text-[10px] font-black text-leaf dark:bg-leaf/20">
+                    No. {sequenceNumber}
+                  </span>
+                ) : null}
+                {!compact && <p className="text-xs uppercase tracking-wide text-black/45 dark:text-white/45">Invoice</p>}
+              </div>
               <h3 className={`${compact ? "text-sm" : "text-lg"} truncate font-bold leading-tight`}>{order.invoiceNo}</h3>
               <p className={`${compact ? "text-xs" : "mt-0.5 text-sm"} truncate text-black/60 dark:text-white/60`}>{order.customerName}</p>
             </div>
