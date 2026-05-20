@@ -408,6 +408,57 @@ describe("pdf parser", () => {
     );
   });
 
+  it("does not treat price-led item names as the next serial number", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "4",
+      "5/- \u0935\u0940\u0930\u093e \u0930\u093f\u0902\u0917",
+      "Veera Ring1 Rs 52 Rs 52",
+      "5",
+      "\u0938\u094b\u092c\u0940\u0938\u094d\u0915\u094b \u0915\u093e\u091c\u0942 20/-",
+      "Sobisco Kaju 106g6 Rs 18 Rs 108",
+      "Total7 Rs 160"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        quantity: item.quantity,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 4, productName: "5/- \u0935\u0940\u0930\u093e \u0930\u093f\u0902\u0917", quantity: 1, totalAmount: 52 },
+        { serialNo: 5, productName: "\u0938\u094b\u092c\u0940\u0938\u094d\u0915\u094b \u0915\u093e\u091c\u0942 20/-", quantity: 6, totalAmount: 108 }
+      ]
+    );
+  });
+
+  it("keeps zero-price free rows with their quantity", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "22Free Colgate1 Rs 0 Rs 0",
+      "23",
+      "\u0928\u093f\u0936\u093e \u0936\u093e\u092e\u094d\u092a\u0942 20/-",
+      "Nisha Shampoo 20/-1 Rs 120 Rs 120",
+      "Total2 Rs 120"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 22, productName: "Free Colgate", quantity: 1, pricePerUnit: 0, totalAmount: 0 },
+        { serialNo: 23, productName: "\u0928\u093f\u0936\u093e \u0936\u093e\u092e\u094d\u092a\u0942 20/-", quantity: 1, pricePerUnit: 120, totalAmount: 120 }
+      ]
+    );
+  });
+
   it("keeps multi-line item details and glued serial rows in order", () => {
     const items = extractItems([
       "#Item nameItem codeQuantityPrice/ unitAmount",

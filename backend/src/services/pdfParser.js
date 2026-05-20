@@ -188,7 +188,15 @@ function buildParserDiagnostics(items = []) {
 
   const duplicateSerials = serials.filter((serialNo, index) => serials.indexOf(serialNo) !== index);
   const fallbackRows = items
-    .filter((item) => !item?.itemName || !item?.quantity || !item?.pricePerUnit || !item?.totalAmount)
+    .filter((item) => (
+      !item?.itemName ||
+      !Number.isFinite(item?.quantity) ||
+      item.quantity <= 0 ||
+      !Number.isFinite(item?.pricePerUnit) ||
+      item.pricePerUnit < 0 ||
+      !Number.isFinite(item?.totalAmount) ||
+      item.totalAmount < 0
+    ))
     .map((item) => item?.serialNo)
     .filter(Number.isFinite);
 
@@ -299,7 +307,7 @@ function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmoun
   const safePrice = Number.isFinite(pricePerUnit) ? pricePerUnit : 0;
   const safeTotal = Number.isFinite(totalAmount) ? totalAmount : 0;
 
-  if (!safeName || isLikelyHeaderLine(safeName) || safePrice <= 0 || safeTotal <= 0) return null;
+  if (!safeName || isLikelyHeaderLine(safeName) || safePrice < 0 || safeTotal < 0) return null;
 
   const hasExplicitQuantity = quantity !== null && quantity !== undefined && Number.isFinite(quantity);
   const calculatedQuantity = hasExplicitQuantity ? quantity : safeTotal / safePrice;
@@ -627,11 +635,12 @@ function splitSerialPrefix(line, expectedSerial) {
   if (Number.isInteger(expectedSerial) && expectedSerial > 0) {
     const expectedText = expectedSerial.toString();
     const nextCharacter = line.charAt(expectedText.length);
-    if (line.startsWith(expectedText) && line.length > expectedText.length && !/\s/.test(nextCharacter) && (!/\d/.test(nextCharacter) || expectedText.length > 1)) {
+    const restAfterExpected = line.slice(expectedText.length);
+    if (line.startsWith(expectedText) && line.length > expectedText.length && !restAfterExpected.startsWith("/-") && !/\s/.test(nextCharacter) && (!/\d/.test(nextCharacter) || expectedText.length > 1)) {
       return { serialNo: expectedSerial, rest: line.slice(expectedText.length).trim() };
     }
 
-    const rest = line.slice(expectedText.length).trim();
+    const rest = restAfterExpected.trim();
     if (line.startsWith(expectedText) && /^(?:Rs|INR)\b/i.test(rest)) {
       return { serialNo: expectedSerial, rest };
     }
@@ -641,6 +650,11 @@ function splitSerialPrefix(line, expectedSerial) {
     const firstCompact = line.match(/^1(?![\d\s])(.+)$/);
     if (firstCompact) {
       return { serialNo: 1, rest: firstCompact[1].trim() };
+    }
+
+    const compactSerial = line.match(/^(\d{1,3})(?![\d\s])(.+)$/);
+    if (compactSerial && getStrictAmountDetail(compactSerial[2].trim())) {
+      return { serialNo: Number.parseInt(compactSerial[1], 10), rest: compactSerial[2].trim() };
     }
 
     const firstCurrencyCompact = line.match(/^1\s+((?:Rs|INR)\b.+)$/i);
@@ -710,9 +724,20 @@ function parseStrictAmountDetail(line = "") {
   const amountMatch = currencyMatches.at(-1);
   const pricePerUnit = toNumber(priceMatch[1]);
   const totalAmount = toNumber(amountMatch[1]);
-  if (!Number.isFinite(pricePerUnit) || pricePerUnit <= 0 || !Number.isFinite(totalAmount) || totalAmount <= 0) return null;
+  if (!Number.isFinite(pricePerUnit) || pricePerUnit < 0 || !Number.isFinite(totalAmount) || totalAmount < 0) return null;
 
   const beforePrice = line.slice(0, priceMatch.index).trim();
+  if (pricePerUnit === 0 && totalAmount === 0) {
+    const zeroValueQuantityMatch = beforePrice.match(/(\d+(?:\.\d+)?)$/);
+    return {
+      barcode: "",
+      quantity: zeroValueQuantityMatch ? toNumber(zeroValueQuantityMatch[1]) : 0,
+      pricePerUnit,
+      totalAmount,
+      codeColumnText: zeroValueQuantityMatch ? beforePrice.slice(0, zeroValueQuantityMatch.index).trim() : beforePrice
+    };
+  }
+
   const chooseQuantitySplit = (digits) => {
     const candidates = [];
     for (let length = 1; length <= digits.length; length += 1) {
