@@ -35,6 +35,7 @@ const orderSchema = new mongoose.Schema(
     currentBalance: { type: Number, min: 0 },
     paymentType: { type: String, trim: true },
     paidAmount: { type: Number, min: 0 },
+    orderSequence: { type: Number, index: true },
     items: [orderItemSchema],
     packedStatus: {
       type: String,

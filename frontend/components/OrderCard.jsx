@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, ClipboardList, Loader2, PackageCheck, Trash2 } from "lucide-react";
+import { CheckCircle2, ClipboardList, Loader2, MoveDown, MoveUp, PackageCheck, Trash2 } from "lucide-react";
 import { memo, useState } from "react";
 import ProgressRing from "./ProgressRing";
 
-function OrderCard({ order, onDelete, compact = false }) {
+function OrderCard({ order, onDelete, compact = false, sequenceControls = false, onMoveUp, onMoveDown, canMoveUp = false, canMoveDown = false, moving = false }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const totals = order.progress || {
@@ -75,17 +75,45 @@ function OrderCard({ order, onDelete, compact = false }) {
           )}
         </Link>
 
-        <button
-          type="button"
-          onClick={() => setDeleteOpen(true)}
-          disabled={deleting}
-          className={`${compact ? "grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40" : "mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"}`}
-          aria-label={`Move invoice ${order.invoiceNo} to trash`}
-          title="Move to trash"
-        >
-          {deleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-          {!compact && "Move to Trash"}
-        </button>
+        <div className={compact ? "grid shrink-0 gap-1" : "mt-4 grid gap-2"}>
+          {sequenceControls && (
+            <div className={compact ? "grid gap-1" : "grid grid-cols-2 gap-2"}>
+              <button
+                type="button"
+                onClick={() => onMoveUp?.(order)}
+                disabled={!canMoveUp || moving}
+                className={`${compact ? "grid h-8 w-9 place-items-center rounded-lg" : "flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm"} border border-black/10 bg-white font-bold text-black/70 transition hover:bg-limewash disabled:opacity-35 dark:border-white/10 dark:bg-[#151f1a] dark:text-white/70`}
+                aria-label={`Move invoice ${order.invoiceNo} up`}
+                title="Move up"
+              >
+                <MoveUp size={16} />
+                {!compact && "Up"}
+              </button>
+              <button
+                type="button"
+                onClick={() => onMoveDown?.(order)}
+                disabled={!canMoveDown || moving}
+                className={`${compact ? "grid h-8 w-9 place-items-center rounded-lg" : "flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm"} border border-black/10 bg-white font-bold text-black/70 transition hover:bg-limewash disabled:opacity-35 dark:border-white/10 dark:bg-[#151f1a] dark:text-white/70`}
+                aria-label={`Move invoice ${order.invoiceNo} down`}
+                title="Move down"
+              >
+                <MoveDown size={16} />
+                {!compact && "Down"}
+              </button>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(true)}
+            disabled={deleting || moving}
+            className={`${compact ? "grid h-9 w-9 place-items-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40" : "flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"}`}
+            aria-label={`Move invoice ${order.invoiceNo} to trash`}
+            title="Move to trash"
+          >
+            {deleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
+            {!compact && "Move to Trash"}
+          </button>
+        </div>
         </div>
       </article>
 

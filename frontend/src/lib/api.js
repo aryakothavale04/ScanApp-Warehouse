@@ -68,6 +68,9 @@ export const api = {
   health: () => request("/api/health"),
   test: () => request("/api/test"),
   orders: () => request("/api/orders"),
+  updateOrderSequence: (orderIds) => request("/api/orders/sequence", "patch", {
+    data: { orderIds }
+  }),
   trashedOrders: () => request("/api/orders/trash"),
   order: (id) => request(`/api/orders/${id}`),
   updateOrder: (id, order) =>

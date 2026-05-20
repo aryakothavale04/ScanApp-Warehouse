@@ -1,6 +1,6 @@
 "use client";
 
-import { Boxes, CheckCircle2, TimerReset, Trash2 } from "lucide-react";
+import { Boxes, CheckCircle2, ListOrdered, Loader2, TimerReset, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { api, clearStoredAccessCode } from "@/src/lib/api";
@@ -13,6 +13,8 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
   const [trashedOrders, setTrashedOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sequenceMode, setSequenceMode] = useState(false);
+  const [movingOrderId, setMovingOrderId] = useState(null);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
@@ -44,6 +46,37 @@ export default function AdminDashboard() {
   function logout() {
     clearStoredAccessCode();
     window.dispatchEvent(new Event("scanapp-auth-required"));
+  }
+
+  async function moveOrder(orderToMove, direction) {
+    const groupCompleted = orderToMove.packedStatus === "Completed" || orderToMove.packedStatus === "Packed";
+    const groupOrderIds = orders
+      .filter((order) => (order.packedStatus === "Completed" || order.packedStatus === "Packed") === groupCompleted)
+      .map((order) => order._id);
+    const currentGroupIndex = groupOrderIds.indexOf(orderToMove._id);
+    const nextGroupIndex = direction === "up" ? currentGroupIndex - 1 : currentGroupIndex + 1;
+
+    if (currentGroupIndex < 0 || nextGroupIndex < 0 || nextGroupIndex >= groupOrderIds.length) return;
+
+    const nextOrders = [...orders];
+    const currentIndex = nextOrders.findIndex((order) => order._id === groupOrderIds[currentGroupIndex]);
+    const nextIndex = nextOrders.findIndex((order) => order._id === groupOrderIds[nextGroupIndex]);
+    if (currentIndex < 0 || nextIndex < 0) return;
+
+    [nextOrders[currentIndex], nextOrders[nextIndex]] = [nextOrders[nextIndex], nextOrders[currentIndex]];
+    setOrders(nextOrders);
+    setMovingOrderId(orderToMove._id);
+
+    try {
+      const data = await api.updateOrderSequence(nextOrders.map((order) => order._id));
+      setOrders(data.orders || nextOrders);
+      setToast({ type: "success", message: "Order sequence updated" });
+    } catch (error) {
+      setToast({ type: "error", message: error.message });
+      loadOrders();
+    } finally {
+      setMovingOrderId(null);
+    }
   }
 
   useEffect(() => {
@@ -145,11 +178,21 @@ export default function AdminDashboard() {
             <UploadInvoice onUploaded={loadOrders} onToast={setToast} />
           </div>
           <section>
-            <div className="mb-1.5 flex items-center justify-between">
+            <div className="mb-1.5 flex items-center justify-between gap-2">
               <h2 className="text-sm font-bold sm:text-base">Pending Orders</h2>
-              <button onClick={loadOrders} className="min-h-9 rounded-lg border border-black/10 px-3 py-1.5 text-xs font-semibold dark:border-white/10 sm:min-h-10 sm:text-sm">
-                Refresh
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSequenceMode((current) => !current)}
+                  className={`flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold sm:min-h-10 sm:text-sm ${sequenceMode ? "border-leaf bg-leaf text-white" : "border-black/10 bg-white dark:border-white/10 dark:bg-transparent"}`}
+                >
+                  <ListOrdered size={15} />
+                  Sequence
+                </button>
+                <button onClick={loadOrders} className="min-h-9 rounded-lg border border-black/10 px-3 py-1.5 text-xs font-semibold dark:border-white/10 sm:min-h-10 sm:text-sm">
+                  Refresh
+                </button>
+              </div>
             </div>
             {loading ? (
               <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
@@ -159,8 +202,19 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
-                {stats.pendingOrders.map((order) => (
-                  <OrderCard key={order._id} order={order} onDelete={deleteOrder} compact />
+                {stats.pendingOrders.map((order, index) => (
+                  <OrderCard
+                    key={order._id}
+                    order={order}
+                    onDelete={deleteOrder}
+                    compact
+                    sequenceControls={sequenceMode}
+                    onMoveUp={(entry) => moveOrder(entry, "up")}
+                    onMoveDown={(entry) => moveOrder(entry, "down")}
+                    canMoveUp={index > 0}
+                    canMoveDown={index < stats.pendingOrders.length - 1}
+                    moving={Boolean(movingOrderId)}
+                  />
                 ))}
                 {!stats.pendingOrders.length && (
                   <div className="rounded-lg bg-white p-6 text-center text-sm text-black/55 dark:bg-[#151f1a] dark:text-white/55">
@@ -174,11 +228,23 @@ export default function AdminDashboard() {
         <section id="completed-orders" className="mt-4 sm:mt-6">
           <div className="mb-1.5 flex items-center justify-between">
             <h2 className="text-sm font-bold sm:text-base">Completed Orders</h2>
+            {movingOrderId && <Loader2 className="animate-spin text-leaf" size={17} />}
           </div>
           {loading ? null : (
             <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 lg:grid-cols-3">
-              {stats.completedOrders.map((order) => (
-                <OrderCard key={order._id} order={order} onDelete={deleteOrder} compact />
+              {stats.completedOrders.map((order, index) => (
+                <OrderCard
+                  key={order._id}
+                  order={order}
+                  onDelete={deleteOrder}
+                  compact
+                  sequenceControls={sequenceMode}
+                  onMoveUp={(entry) => moveOrder(entry, "up")}
+                  onMoveDown={(entry) => moveOrder(entry, "down")}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < stats.completedOrders.length - 1}
+                  moving={Boolean(movingOrderId)}
+                />
               ))}
               {!stats.completedOrders.length && (
                 <div className="rounded-lg bg-white p-6 text-center text-sm text-black/55 dark:bg-[#151f1a] dark:text-white/55">

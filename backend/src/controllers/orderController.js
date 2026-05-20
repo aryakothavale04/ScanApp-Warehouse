@@ -55,6 +55,28 @@ function serializeOrders(orders = [], options) {
   return orders.map((order) => serializeOrder(order, options));
 }
 
+async function normalizeActiveOrderSequence() {
+  const missingOrders = await Order.find({ trashedAt: { $exists: false }, orderSequence: { $exists: false } })
+    .select("_id createdAt")
+    .sort({ createdAt: -1 });
+
+  if (!missingOrders.length) return;
+
+  let nextSequence = 0;
+  const firstSequencedOrder = await Order.findOne({ trashedAt: { $exists: false }, orderSequence: { $exists: true } })
+    .select("orderSequence")
+    .sort({ orderSequence: 1 })
+    .lean();
+
+  if (Number.isFinite(firstSequencedOrder?.orderSequence)) {
+    nextSequence = firstSequencedOrder.orderSequence - missingOrders.length;
+  }
+
+  await Promise.all(missingOrders.map((order, index) => (
+    Order.updateOne({ _id: order._id }, { $set: { orderSequence: nextSequence + index } })
+  )));
+}
+
 function getDeletedOrderItems(orders = []) {
   return orders.flatMap((order) => {
     const data = serializeOrder(order, { includeDeletedItems: true });
@@ -185,8 +207,41 @@ export async function purgeExpiredTrashedOrders() {
 
 export async function listOrders(req, res) {
   await purgeExpiredTrashedOrders();
-  const orders = await populateOrder(Order.find({ trashedAt: { $exists: false } }).sort({ createdAt: -1 }));
+  await normalizeActiveOrderSequence();
+  const orders = await populateOrder(Order.find({ trashedAt: { $exists: false } }).sort({ orderSequence: 1, createdAt: -1 }));
   res.json({ orders: serializeOrders(orders) });
+}
+
+export async function updateOrderSequence(req, res) {
+  await purgeExpiredTrashedOrders();
+  await normalizeActiveOrderSequence();
+
+  const orderIds = Array.isArray(req.body?.orderIds) ? req.body.orderIds.map((id) => id?.toString()).filter(Boolean) : [];
+  if (!orderIds.length) {
+    return res.status(400).json({ message: "Order sequence is required" });
+  }
+
+  const uniqueOrderIds = [...new Set(orderIds)];
+  const activeOrders = await Order.find({ trashedAt: { $exists: false } }).select("_id orderSequence").sort({ orderSequence: 1, createdAt: -1 }).lean();
+  const activeIdSet = new Set(activeOrders.map((order) => order._id.toString()));
+  const requestedActiveIds = uniqueOrderIds.filter((id) => activeIdSet.has(id));
+
+  if (!requestedActiveIds.length) {
+    return res.status(400).json({ message: "No active orders found in sequence" });
+  }
+
+  const requestedIdSet = new Set(requestedActiveIds);
+  const orderedIds = [
+    ...requestedActiveIds,
+    ...activeOrders.map((order) => order._id.toString()).filter((id) => !requestedIdSet.has(id))
+  ];
+
+  await Promise.all(orderedIds.map((id, index) => (
+    Order.updateOne({ _id: id, trashedAt: { $exists: false } }, { $set: { orderSequence: index } })
+  )));
+
+  const orders = await populateOrder(Order.find({ trashedAt: { $exists: false } }).sort({ orderSequence: 1, createdAt: -1 }));
+  res.json({ orders: serializeOrders(orders), message: "Order sequence updated" });
 }
 
 export async function listTrashedOrders(req, res) {
@@ -225,6 +280,9 @@ export async function restoreOrder(req, res) {
   }
 
   order.trashedAt = undefined;
+  await normalizeActiveOrderSequence();
+  const firstOrder = await Order.findOne({ trashedAt: { $exists: false } }).select("orderSequence").sort({ orderSequence: 1 }).lean();
+  order.orderSequence = Number.isFinite(firstOrder?.orderSequence) ? firstOrder.orderSequence - 1 : 0;
   await order.save();
 
   const populated = await populateOrder(Order.findById(order._id));
@@ -615,6 +673,8 @@ export async function uploadInvoice(req, res) {
     }
 
     const items = await hydrateInvoiceItems(safeItems);
+    await normalizeActiveOrderSequence();
+    const firstOrder = await Order.findOne({ trashedAt: { $exists: false } }).select("orderSequence").sort({ orderSequence: 1 }).lean();
     const order = await Order.create({
       invoiceNo: parsed.invoiceNo,
       date: parsed.date,
@@ -628,6 +688,7 @@ export async function uploadInvoice(req, res) {
       currentBalance: parsed.currentBalance,
       paymentType: parsed.paymentType,
       paidAmount: parsed.paidAmount,
+      orderSequence: Number.isFinite(firstOrder?.orderSequence) ? firstOrder.orderSequence - 1 : 0,
       items
     });
 

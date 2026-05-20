@@ -17,6 +17,7 @@ import {
   restoreOrder,
   restoreOrderItem,
   scanBarcode,
+  updateOrderSequence,
   updateOrder,
   updateOrderItem,
   uploadInvoice
@@ -33,6 +34,7 @@ const uploadRateLimit = createRateLimiter({
 });
 
 router.get("/", asyncHandler(listOrders));
+router.patch("/sequence", asyncHandler(updateOrderSequence));
 router.post("/upload", uploadRateLimit, invoiceUpload.single("invoice"), asyncHandler(uploadInvoice));
 router.get("/trash", asyncHandler(listTrashedOrders));
 router.delete("/trash/empty", asyncHandler(emptyTrash));
