@@ -459,6 +459,36 @@ describe("pdf parser", () => {
     );
   });
 
+  it("uses only the item-name text when text item code is glued to it", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "1",
+      "SA \u0932\u0902\u091a \u092c\u0949\u0915\u094d\u0938 5/-Lunch Box1 Rs 52 Rs 52",
+      "2",
+      "Rk \u092c\u094d\u0932\u0947\u0921Rk Blade1 Rs 42 Rs 42",
+      "3",
+      "\u20b910 Vanilla Cone 40ml1 Rs 306 Rs 306",
+      "4",
+      "\u0938\u094b\u092c\u0940\u0938\u094d\u0915\u094b \u0915\u0947\u0915 \u092e\u0901\u0917\u094b \u092e\u0901\u0917\u094b \u20b95\u00d712pic 89023517777731 Rs 52 Rs 52",
+      "Total4 Rs 452"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        hsnOrBarcode: item.hsnOrBarcode,
+        quantity: item.quantity
+      })),
+      [
+        { serialNo: 1, productName: "SA \u0932\u0902\u091a \u092c\u0949\u0915\u094d\u0938 5/-", hsnOrBarcode: "", quantity: 1 },
+        { serialNo: 2, productName: "Rk \u092c\u094d\u0932\u0947\u0921", hsnOrBarcode: "", quantity: 1 },
+        { serialNo: 3, productName: "\u20b910 Vanilla Cone 40ml", hsnOrBarcode: "", quantity: 1 },
+        { serialNo: 4, productName: "\u0938\u094b\u092c\u0940\u0938\u094d\u0915\u094b \u0915\u0947\u0915 \u092e\u0901\u0917\u094b \u092e\u0901\u0917\u094b \u20b95\u00d712pic", hsnOrBarcode: "8902351777773", quantity: 1 }
+      ]
+    );
+  });
+
   it("preserves compact rows when serials are glued to digit-led product names", () => {
     const items = extractItems([
       "#Item nameItem codeQuantityPrice/ unitAmount",
@@ -481,8 +511,8 @@ describe("pdf parser", () => {
 
     assert.deepEqual(items.map((item) => item.serialNo), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
     assert.deepEqual(items.map((item) => item.quantity), [2, 1, 2, 2, 1, 1, 0.5, 1, 1, 1, 1, 1, 1, 1]);
-    assert.equal(items[0].productName, "1/- \u091f\u093e\u0907\u092e\u092a\u093e\u0938Timepass");
-    assert.equal(items[4].productName, "250ml \u0925\u092e\u094d\u0938 \u0905\u092a \u20b920Thums Ups 250ml");
+    assert.equal(items[0].productName, "1/- \u091f\u093e\u0907\u092e\u092a\u093e\u0938");
+    assert.equal(items[4].productName, "250ml \u0925\u092e\u094d\u0938 \u0905\u092a \u20b920");
   });
 
   it("keeps multi-line item details and glued serial rows in order", () => {

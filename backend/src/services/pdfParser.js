@@ -241,6 +241,36 @@ function cleanEnglishProductName(value = "") {
     .trim();
 }
 
+function stripMergedTextItemCode(value = "") {
+  const text = value.toString().trim();
+  if (!hasIndicScript(text) || !hasLatin(text)) return text;
+
+  const aliasMatches = [...text.matchAll(/[A-Z][^\u0900-\u097F]*$/g)];
+  for (const match of aliasMatches) {
+    const index = match.index ?? -1;
+    if (index <= 0) continue;
+
+    const before = text.slice(0, index);
+    if (!hasIndicScript(before)) continue;
+
+    const previous = text[index - 1] || "";
+    if (/\d/.test(previous)) {
+      const itemName = before.trim();
+      return itemName || text;
+    }
+    if (/[\s/.-]/.test(previous)) {
+      const itemName = before.trim();
+      return itemName || text;
+    }
+    if (/[\d\s/×x.-]/i.test(previous)) continue;
+
+    const itemName = before.trim();
+    return itemName || text;
+  }
+
+  return text;
+}
+
 function isLikelyHeaderLine(line = "") {
   const normalized = line.toString().toLowerCase();
   const compact = normalized.replace(/[^a-z#]/g, "");
@@ -296,7 +326,7 @@ function logMalformedRow(row) {
 }
 
 function buildItem(productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, invoiceLine, options = {}) {
-  let safeName = cleanEnglishProductName(productName);
+  let safeName = stripMergedTextItemCode(cleanEnglishProductName(productName));
   const packPrice = Number.isFinite(options.packPrice) && options.packPrice > 0 ? options.packPrice : null;
   if (
     packPrice &&
@@ -541,6 +571,10 @@ function hasNativeScript(value = "") {
   return /[^\u0000-\u007F]/.test(value);
 }
 
+function hasIndicScript(value = "") {
+  return /[\u0900-\u097F]/.test(value);
+}
+
 function isolateMultilingualName(rawName = "", inferredQuantity, pricePerUnit = null, totalAmount = null) {
   let working = cleanProductName(rawName);
   let quantity = null;
@@ -697,7 +731,7 @@ function makeStrictItem({
   totalAmount = 0,
   invoiceLine = ""
 }) {
-  const cleanName = restoreDisplayCurrency(itemName);
+  const cleanName = stripMergedTextItemCode(restoreDisplayCurrency(itemName));
   const cleanBarcode = isValidBarcode(barcode) ? barcode.toString().trim() : "";
   const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
   const safePrice = Number.isFinite(pricePerUnit) && pricePerUnit > 0 ? pricePerUnit : 0;
