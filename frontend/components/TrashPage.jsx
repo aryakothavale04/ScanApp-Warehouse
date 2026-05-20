@@ -116,24 +116,34 @@ export default function TrashPage() {
       <Toast toast={toast} onClose={() => setToast(null)} />
       <div className="mx-auto max-w-4xl px-2.5 py-2.5 sm:px-5 sm:py-4">
         <header className="-mx-2.5 mb-3 grid gap-1 border-b border-black/5 bg-limewash/95 px-2.5 py-2 backdrop-blur dark:border-white/5 dark:bg-[#101714]/95 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <StoreBrand />
-              <h1 className="mt-0.5 text-sm font-black sm:text-lg">Trash</h1>
-            </div>
-            {!loading && (orders.length || items.length) ? (
-              <button
-                type="button"
-                onClick={() => setEmptyOpen(true)}
-                disabled={busyId === "empty-trash"}
-                className="flex min-h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-700 disabled:opacity-60 dark:border-red-900/70 dark:bg-[#151f1a] dark:text-red-300"
-              >
-                {busyId === "empty-trash" ? <Loader2 className="animate-spin" size={15} /> : <Trash2 size={15} />}
-                Empty all
-              </button>
-            ) : null}
+          <div className="min-w-0">
+            <StoreBrand />
+            <h1 className="mt-0.5 text-sm font-black sm:text-lg">Trash</h1>
           </div>
-          <nav className="mt-2 grid grid-cols-2 gap-2">
+        </header>
+
+        {!loading && (orders.length || items.length) ? (
+          <div className="mb-3 grid gap-2 sm:flex sm:items-center sm:justify-between">
+            <nav className="grid grid-cols-2 gap-2 sm:flex sm:min-w-0">
+              <a href="#order-trash" className="flex min-h-9 items-center justify-center rounded-lg bg-white px-3 py-1.5 text-xs font-black text-black/70 shadow-sm dark:bg-[#151f1a] dark:text-white/75 sm:min-w-32">
+                Orders ({orders.length})
+              </a>
+              <a href="#product-trash" className="flex min-h-9 items-center justify-center rounded-lg bg-white px-3 py-1.5 text-xs font-black text-black/70 shadow-sm dark:bg-[#151f1a] dark:text-white/75 sm:min-w-32">
+                Products ({items.length})
+              </a>
+            </nav>
+            <button
+              type="button"
+              onClick={() => setEmptyOpen(true)}
+              disabled={busyId === "empty-trash"}
+              className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 shadow-sm disabled:opacity-60 dark:border-red-900/70 dark:bg-[#151f1a] dark:text-red-300 sm:w-auto sm:min-w-32"
+            >
+              {busyId === "empty-trash" ? <Loader2 className="animate-spin" size={15} /> : <Trash2 size={15} />}
+              Empty all
+            </button>
+          </div>
+        ) : (
+          <nav className="mb-3 grid grid-cols-2 gap-2">
             <a href="#order-trash" className="flex min-h-9 items-center justify-center rounded-lg bg-white px-3 py-1.5 text-xs font-black text-black/70 shadow-sm dark:bg-[#151f1a] dark:text-white/75">
               Orders ({orders.length})
             </a>
@@ -141,7 +151,7 @@ export default function TrashPage() {
               Products ({items.length})
             </a>
           </nav>
-        </header>
+        )}
 
         {loading ? (
           <div className="grid min-h-[50vh] place-items-center">
