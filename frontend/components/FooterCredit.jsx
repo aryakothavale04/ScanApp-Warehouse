@@ -7,7 +7,7 @@ export default function FooterCredit({ inline = false }) {
   const creditContent = (
     <a className={creditLinkClass} href={creditLink}>
       <span className="block">Developed by Arya Kothavale</span>
-      <span className="mt-1 block normal-case tracking-[0.08em]">
+      <span className="mt-1 block normal-case tracking-[0.08em] text-blue-700 underline underline-offset-2 dark:text-blue-300">
         kothavalearya.online
       </span>
     </a>
