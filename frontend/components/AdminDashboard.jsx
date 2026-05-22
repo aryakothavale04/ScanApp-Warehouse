@@ -16,6 +16,7 @@ export default function AdminDashboard() {
   const [sequenceMode, setSequenceMode] = useState(false);
   const [movingOrderId, setMovingOrderId] = useState(null);
   const [sequenceTarget, setSequenceTarget] = useState(null);
+  const [sequenceGroup, setSequenceGroup] = useState("pending");
   const [sequenceDraft, setSequenceDraft] = useState("");
   const [sequenceSaving, setSequenceSaving] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -124,8 +125,9 @@ export default function AdminDashboard() {
     }
   }
 
-  function openSequenceEditor(order, sequenceNumber) {
+  function openSequenceEditor(order, sequenceNumber, group = "pending") {
     setSequenceTarget(order);
+    setSequenceGroup(group);
     setSequenceDraft(String(sequenceNumber));
   }
 
@@ -134,11 +136,13 @@ export default function AdminDashboard() {
     if (!sequenceTarget || sequenceSaving) return;
 
     setSequenceSaving(true);
-    const moved = await moveOrderToSequence(sequenceTarget, sequenceDraft);
+    const groupOrders = sequenceGroup === "completed" ? stats.completedOrders : stats.pendingOrders;
+    const moved = await moveOrderToSequence(sequenceTarget, sequenceDraft, groupOrders);
     setSequenceSaving(false);
 
     if (moved) {
       setSequenceTarget(null);
+      setSequenceGroup("pending");
       setSequenceDraft("");
     }
   }
@@ -201,6 +205,8 @@ export default function AdminDashboard() {
       color: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-100"
     }
   ];
+  const sequenceGroupOrders = sequenceGroup === "completed" ? stats.completedOrders : stats.pendingOrders;
+  const sequenceGroupLabel = sequenceGroup === "completed" ? "completed" : "pending";
 
   return (
     <main className="min-h-screen safe-bottom">
@@ -273,7 +279,7 @@ export default function AdminDashboard() {
                     onDelete={deleteOrder}
                     compact
                     sequenceNumber={index + 1}
-                    onSequenceClick={(entry) => openSequenceEditor(entry, index + 1)}
+                    onSequenceClick={(entry) => openSequenceEditor(entry, index + 1, "pending")}
                     sequenceControls={sequenceMode}
                     onMoveUp={(entry) => moveOrder(entry, "up")}
                     onMoveDown={(entry) => moveOrder(entry, "down")}
@@ -304,6 +310,8 @@ export default function AdminDashboard() {
                   order={order}
                   onDelete={deleteOrder}
                   compact
+                  sequenceNumber={index + 1}
+                  onSequenceClick={(entry) => openSequenceEditor(entry, index + 1, "completed")}
                   sequenceControls={sequenceMode}
                   onMoveUp={(entry) => moveOrder(entry, "up")}
                   onMoveDown={(entry) => moveOrder(entry, "down")}
@@ -364,7 +372,7 @@ export default function AdminDashboard() {
             <div className="mb-4">
               <h2 className="text-lg font-black">Change Sequence</h2>
               <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-                Move invoice <span className="font-bold text-black dark:text-white">{sequenceTarget.invoiceNo}</span> to sequence number.
+                Move invoice <span className="font-bold text-black dark:text-white">{sequenceTarget.invoiceNo}</span> to {sequenceGroupLabel} sequence number.
               </p>
             </div>
             <label className="mb-4 block">
@@ -372,7 +380,7 @@ export default function AdminDashboard() {
               <input
                 type="number"
                 min="1"
-                max={stats.pendingOrders.length}
+                max={sequenceGroupOrders.length}
                 step="1"
                 autoFocus
                 value={sequenceDraft}
@@ -385,6 +393,7 @@ export default function AdminDashboard() {
                 type="button"
                 onClick={() => {
                   setSequenceTarget(null);
+                  setSequenceGroup("pending");
                   setSequenceDraft("");
                 }}
                 disabled={sequenceSaving}
