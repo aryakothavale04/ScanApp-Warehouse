@@ -64,5 +64,7 @@ orderSchema.virtual("progress").get(function progress() {
 
 orderSchema.set("toJSON", { virtuals: true });
 orderSchema.set("toObject", { virtuals: true });
+orderSchema.index({ trashedAt: 1, orderSequence: 1, createdAt: -1 });
+orderSchema.index({ "items.trashedAt": 1, trashedAt: 1, updatedAt: -1 });
 
 export const Order = mongoose.model("Order", orderSchema);

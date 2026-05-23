@@ -27,8 +27,29 @@ export async function findProductForInvoiceName(productName, hsnOrBarcode) {
   }) || null;
 }
 
+function findProductInSnapshot(products, productName, hsnOrBarcode) {
+  const barcode = hsnOrBarcode?.toString().trim();
+  if (barcode) {
+    const product = products.byBarcode.get(barcode);
+    if (product) return product;
+  }
+
+  const normalizedName = normalize(productName);
+  if (!normalizedName) return null;
+
+  return products.all.find((product) => {
+    const names = [product.productName, ...(product.aliases || [])].map(normalize);
+    return names.some((name) => name === normalizedName || normalizedName.includes(name) || name.includes(normalizedName));
+  }) || null;
+}
+
 export async function hydrateInvoiceItems(items) {
   const hydrated = [];
+  const allProducts = await Product.find({}).select("_id productName barcode aliases category").lean();
+  const productSnapshot = {
+    all: allProducts,
+    byBarcode: new Map(allProducts.map((product) => [product.barcode, product]))
+  };
 
   for (const item of items || []) {
     const itemName = item?.itemName || item?.productName || "";
@@ -36,7 +57,7 @@ export async function hydrateInvoiceItems(items) {
     let product = null;
 
     try {
-      product = await findProductForInvoiceName(itemName, item?.hsnOrBarcode);
+      product = findProductInSnapshot(productSnapshot, itemName, item?.hsnOrBarcode);
     } catch (error) {
       console.warn("Product match failed; preserving invoice row:", {
         serialNo: item?.serialNo,

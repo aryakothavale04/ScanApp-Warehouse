@@ -1,6 +1,5 @@
 import { Order } from "../models/Order.js";
 import { PackingLog } from "../models/PackingLog.js";
-import { Product } from "../models/Product.js";
 import { parseVyaparInvoice } from "../services/pdfParser.js";
 import { hydrateInvoiceItems } from "../services/productMatcher.js";
 
@@ -9,6 +8,9 @@ function populateOrder(query) {
 }
 
 const TRASH_RETENTION_MS = 24 * 60 * 60 * 1000;
+const TRASH_CLEANUP_MIN_INTERVAL_MS = Number.parseInt(process.env.TRASH_CLEANUP_MIN_INTERVAL_MS || "300000", 10);
+let lastTrashCleanupAt = 0;
+let trashCleanupPromise = null;
 
 function isItemTrashed(item) {
   return Boolean(item?.trashedAt);
@@ -116,6 +118,11 @@ function isCompletedStatus(status) {
   return status === "Completed" || status === "Packed";
 }
 
+function getProductId(value) {
+  if (!value) return undefined;
+  return value?._id || value;
+}
+
 function findOrderItemByScan(order, scannedValue) {
   const scannedBarcode = normalizeBarcode(scannedValue);
   const scannedText = normalizeScanText(scannedValue);
@@ -205,15 +212,37 @@ export async function purgeExpiredTrashedOrders() {
   return { deletedCount: result.deletedCount || 0, deletedItemCount };
 }
 
+async function purgeExpiredTrashedOrdersIfDue({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now - lastTrashCleanupAt < TRASH_CLEANUP_MIN_INTERVAL_MS) {
+    return { skipped: true };
+  }
+
+  if (!trashCleanupPromise) {
+    trashCleanupPromise = purgeExpiredTrashedOrders()
+      .then((result) => {
+        lastTrashCleanupAt = Date.now();
+        return result;
+      })
+      .finally(() => {
+        trashCleanupPromise = null;
+      });
+  }
+
+  return trashCleanupPromise;
+}
+
 export async function listOrders(req, res) {
-  await purgeExpiredTrashedOrders();
+  await purgeExpiredTrashedOrdersIfDue();
   await normalizeActiveOrderSequence();
-  const orders = await populateOrder(Order.find({ trashedAt: { $exists: false } }).sort({ orderSequence: 1, createdAt: -1 }));
+  const orders = await populateOrder(
+    Order.find({ trashedAt: { $exists: false } }).sort({ orderSequence: 1, createdAt: -1 }).lean({ virtuals: true })
+  );
   res.json({ orders: serializeOrders(orders) });
 }
 
 export async function updateOrderSequence(req, res) {
-  await purgeExpiredTrashedOrders();
+  await purgeExpiredTrashedOrdersIfDue();
   await normalizeActiveOrderSequence();
 
   const orderIds = Array.isArray(req.body?.orderIds) ? req.body.orderIds.map((id) => id?.toString()).filter(Boolean) : [];
@@ -240,14 +269,20 @@ export async function updateOrderSequence(req, res) {
     Order.updateOne({ _id: id, trashedAt: { $exists: false } }, { $set: { orderSequence: index } })
   )));
 
-  const orders = await populateOrder(Order.find({ trashedAt: { $exists: false } }).sort({ orderSequence: 1, createdAt: -1 }));
+  const orders = await populateOrder(
+    Order.find({ trashedAt: { $exists: false } }).sort({ orderSequence: 1, createdAt: -1 }).lean({ virtuals: true })
+  );
   res.json({ orders: serializeOrders(orders), message: "Order sequence updated" });
 }
 
 export async function listTrashedOrders(req, res) {
-  await purgeExpiredTrashedOrders();
-  const orders = await populateOrder(Order.find({ trashedAt: { $exists: true } }).sort({ trashedAt: -1 }));
-  const ordersWithDeletedItems = await populateOrder(Order.find({ "items.trashedAt": { $exists: true }, trashedAt: { $exists: false } }).sort({ updatedAt: -1 }));
+  await purgeExpiredTrashedOrdersIfDue({ force: true });
+  const orders = await populateOrder(
+    Order.find({ trashedAt: { $exists: true } }).sort({ trashedAt: -1 }).lean({ virtuals: true })
+  );
+  const ordersWithDeletedItems = await populateOrder(
+    Order.find({ "items.trashedAt": { $exists: true }, trashedAt: { $exists: false } }).sort({ updatedAt: -1 }).lean({ virtuals: true })
+  );
   res.json({
     orders: serializeOrders(orders, { includeDeletedItems: true }),
     items: getDeletedOrderItems(ordersWithDeletedItems)
@@ -363,7 +398,7 @@ export async function emptyTrash(req, res) {
 }
 
 export async function updateOrder(req, res) {
-  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -376,12 +411,11 @@ export async function updateOrder(req, res) {
   order.customerName = customerName.trim();
   await order.save();
 
-  const populated = await populateOrder(Order.findById(order._id));
-  res.json({ message: "Party name updated", order: serializeOrder(populated) });
+  res.json({ message: "Party name updated", order: serializeOrder(order) });
 }
 
 export async function addOrderItem(req, res) {
-  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -410,12 +444,11 @@ export async function addOrderItem(req, res) {
   order.recalculateStatus();
   await order.save();
 
-  const populated = await populateOrder(Order.findById(order._id));
-  res.status(201).json({ message: "Item added", order: serializeOrder(populated) });
+  res.status(201).json({ message: "Item added", order: serializeOrder(order) });
 }
 
 export async function updateOrderItem(req, res) {
-  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -444,12 +477,11 @@ export async function updateOrderItem(req, res) {
   order.recalculateStatus();
   await order.save();
 
-  const populated = await populateOrder(Order.findById(order._id));
-  res.json({ message: `${item.productName} updated`, order: serializeOrder(populated) });
+  res.json({ message: `${item.productName} updated`, order: serializeOrder(order) });
 }
 
 export async function deleteOrderItem(req, res) {
-  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -464,12 +496,11 @@ export async function deleteOrderItem(req, res) {
   order.recalculateStatus();
   await order.save();
 
-  const populated = await populateOrder(Order.findById(order._id));
-  res.json({ message: `${item.productName || "Product"} moved to trash`, order: serializeOrder(populated) });
+  res.json({ message: `${item.productName || "Product"} moved to trash`, order: serializeOrder(order) });
 }
 
 export async function manuallyPackOrderItem(req, res) {
-  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -490,23 +521,22 @@ export async function manuallyPackOrderItem(req, res) {
 
   await PackingLog.create({
     orderId: order._id,
-    productId: item.productId,
+    productId: getProductId(item.productId),
     scannedAt: new Date(),
     scannedBy: req.body.scannedBy || "packing-staff",
     barcode: "manual-missing-barcode"
   });
 
-  const populated = await populateOrder(Order.findById(order._id));
   const itemCompleted = item.packedQuantity >= item.quantity;
   res.json({
-    message: populated.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed" : `${item.productName} manually packed`,
-    packedItem: { productId: item.productId, hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
-    order: serializeOrder(populated)
+    message: order.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed" : `${item.productName} manually packed`,
+    packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
+    order: serializeOrder(order)
   });
 }
 
 export async function manuallyPackFullOrderItem(req, res) {
-  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -526,30 +556,28 @@ export async function manuallyPackFullOrderItem(req, res) {
 
   await PackingLog.create({
     orderId: order._id,
-    productId: item.productId,
+    productId: getProductId(item.productId),
     scannedAt: new Date(),
     scannedBy: req.body.scannedBy || "packing-staff",
     barcode: "manual-full-quantity"
   });
 
-  const populated = await populateOrder(Order.findById(order._id));
   res.json({
-    message: populated.packedStatus === "Completed" ? "Order completed" : `${item.productName} full quantity packed`,
-    packedItem: { productId: item.productId, hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
-    order: serializeOrder(populated)
+    message: order.packedStatus === "Completed" ? "Order completed" : `${item.productName} full quantity packed`,
+    packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
+    order: serializeOrder(order)
   });
 }
 
 export async function manuallyCompleteOrder(req, res) {
-  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
 
   const changedItems = getActiveItems(order.items || []).filter((item) => (item.packedQuantity || 0) < (item.quantity || 0));
   if (!changedItems.length) {
-    const populated = await populateOrder(Order.findById(order._id));
-    return res.json({ message: "Order already completed", order: serializeOrder(populated) });
+    return res.json({ message: "Order already completed", order: serializeOrder(order) });
   }
 
   changedItems.forEach((item) => {
@@ -561,21 +589,20 @@ export async function manuallyCompleteOrder(req, res) {
 
   await PackingLog.insertMany(changedItems.map((item) => ({
     orderId: order._id,
-    productId: item.productId,
+    productId: getProductId(item.productId),
     scannedAt: new Date(),
     scannedBy: req.body.scannedBy || "packing-staff",
     barcode: normalizeBarcode(item.hsnOrBarcode || item.productId?.barcode) || "manual-order-complete"
   })));
 
-  const populated = await populateOrder(Order.findById(order._id));
   res.json({
     message: "Order manually completed",
-    order: serializeOrder(populated)
+    order: serializeOrder(order)
   });
 }
 
 export async function removePackedOrderItem(req, res) {
-  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -592,22 +619,21 @@ export async function removePackedOrderItem(req, res) {
   await PackingLog.deleteMany({
     orderId: order._id,
     $or: [
-      { productId: item.productId },
+      { productId: getProductId(item.productId) },
       { barcode: normalizeBarcode(item.hsnOrBarcode || item.productId?.barcode) },
       { barcode: "manual-missing-barcode" },
       { barcode: "manual-full-quantity" }
     ]
   });
 
-  const populated = await populateOrder(Order.findById(order._id));
   res.json({
     message: `${item.productName} removed from packed`,
-    order: serializeOrder(populated)
+    order: serializeOrder(order)
   });
 }
 
 export async function removeOnePackedOrderItem(req, res) {
-  const order = await Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } });
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
     return res.status(404).json({ message: "Order not found" });
   }
@@ -625,10 +651,9 @@ export async function removeOnePackedOrderItem(req, res) {
   order.recalculateStatus();
   await order.save();
 
-  const populated = await populateOrder(Order.findById(order._id));
   res.json({
     message: `1 packed quantity removed from ${item.productName}`,
-    order: serializeOrder(populated)
+    order: serializeOrder(order)
   });
 }
 
@@ -718,10 +743,7 @@ export async function scanBarcode(req, res) {
 
     const scannedBarcode = normalizeBarcode(barcode);
     const scannedText = normalizeScanText(barcode);
-    const product = scannedBarcode ? await Product.findOne({ barcode: barcode.toString().trim() }) : null;
-    const item = findOrderItemByScan(order, barcode) || (
-      product ? getActiveItems(order.items || []).find((entry) => String(entry.productId?._id || entry.productId) === String(product._id)) : null
-    );
+    const item = findOrderItemByScan(order, barcode);
     if (!item) {
       return res.status(404).json({ message: `Wrong item: ${barcode} is not in this order` });
     }
@@ -737,18 +759,17 @@ export async function scanBarcode(req, res) {
 
     await PackingLog.create({
       orderId: order._id,
-      productId: item.productId?._id || item.productId || product?._id,
+      productId: getProductId(item.productId),
       scannedAt: new Date(),
       scannedBy: scannedBy || "packing-staff",
       barcode: scannedBarcode || scannedText
     });
 
-    const populated = await populateOrder(Order.findById(order._id));
     const itemCompleted = item.packedQuantity >= item.quantity;
     res.json({
-      message: populated.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed" : "Item scanned",
-      packedItem: { productId: item.productId?._id || item.productId || product?._id, hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
-      order: serializeOrder(populated)
+      message: order.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed" : "Item scanned",
+      packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
+      order: serializeOrder(order)
     });
   } catch (error) {
     console.error("Scan failed:", error);

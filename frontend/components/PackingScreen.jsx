@@ -79,6 +79,7 @@ export default function PackingScreen({ orderId }) {
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [partyNameOpen, setPartyNameOpen] = useState(false);
   const scanLoadingRef = useRef(false);
+  const pendingScanQueueRef = useRef([]);
   const hardwareScanBufferRef = useRef("");
   const hardwareScanTimerRef = useRef(null);
   const lastWrongScanRef = useRef({ value: "", at: 0 });
@@ -110,28 +111,42 @@ export default function PackingScreen({ orderId }) {
   }, [order]);
 
   const handleScan = useCallback(async (barcode) => {
-    if (scanLoadingRef.current) return;
+    if (scanLoadingRef.current) {
+      if (pendingScanQueueRef.current.length < 20) {
+        pendingScanQueueRef.current.push(barcode);
+      }
+      return;
+    }
+
     scanLoadingRef.current = true;
     setScanLoading(true);
-    try {
-      const data = await api.scan(orderId, barcode);
-      replaceOrder(data.order);
-      setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
-      setToast({ type: "success", message: data.message || "Item packed" });
-      const completedQuantity = data.message === "Qty completed" || data.message === "Order completed";
-      playScanSound(completedQuantity ? "complete" : "correct");
-      window.navigator.vibrate?.(70);
-      setTimeout(() => setLastPackedItemId(null), 900);
-    } catch (error) {
-      const now = Date.now();
-      const scannedValue = barcode?.toString() || "";
-      const isRepeatWrongScan = lastWrongScanRef.current.value === scannedValue && now - lastWrongScanRef.current.at < 2500;
-      lastWrongScanRef.current = { value: scannedValue, at: now };
 
-      setToast({ type: "error", message: error.message });
-      if (!isRepeatWrongScan) {
-        playScanSound("wrong");
-        window.navigator.vibrate?.([80, 40, 80]);
+    let nextBarcode = barcode;
+    try {
+      while (nextBarcode) {
+        try {
+          const data = await api.scan(orderId, nextBarcode);
+          replaceOrder(data.order);
+          setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
+          setToast({ type: "success", message: data.message || "Item packed" });
+          const completedQuantity = data.message === "Qty completed" || data.message === "Order completed";
+          playScanSound(completedQuantity ? "complete" : "correct");
+          window.navigator.vibrate?.(70);
+          setTimeout(() => setLastPackedItemId(null), 900);
+        } catch (error) {
+          const now = Date.now();
+          const scannedValue = nextBarcode?.toString() || "";
+          const isRepeatWrongScan = lastWrongScanRef.current.value === scannedValue && now - lastWrongScanRef.current.at < 2500;
+          lastWrongScanRef.current = { value: scannedValue, at: now };
+
+          setToast({ type: "error", message: error.message });
+          if (!isRepeatWrongScan) {
+            playScanSound("wrong");
+            window.navigator.vibrate?.([80, 40, 80]);
+          }
+        }
+
+        nextBarcode = pendingScanQueueRef.current.shift();
       }
     } finally {
       scanLoadingRef.current = false;
