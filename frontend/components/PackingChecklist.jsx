@@ -277,29 +277,6 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                     )}
                       <button
                         type="button"
-                        onClick={() => removeOnePacked(index)}
-                        disabled={!canRemoveOnePacked}
-                        className={`grid ${actionButtonSize} place-items-center rounded-lg border border-red-200 bg-white text-red-700 shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
-                        aria-label={`Remove one packed quantity from ${item.productName || "product"}`}
-                        title="Unpack 1 qty"
-                      >
-                        <Minus size={actionIconSize} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => manualPack(index)}
-                        disabled={!canManualPack}
-                        className={`grid ${actionButtonSize} place-items-center rounded-lg bg-leaf text-white shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
-                        aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
-                        title="Only 1 qty packed"
-                      >
-                        <Plus size={actionIconSize} />
-                      </button>
-                    </div>
-
-                    <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
-                      <button
-                        type="button"
                         onClick={() => manualPackFull(index)}
                         disabled={!canManualPack}
                         className={`grid ${actionButtonSize} place-items-center rounded-lg bg-emerald-600 text-white shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
@@ -317,6 +294,29 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                         title="Reset packed"
                       >
                         <X size={actionIconSize} />
+                      </button>
+                    </div>
+
+                    <div className="flex flex-wrap justify-end gap-1.5 sm:gap-2">
+                      <button
+                        type="button"
+                        onClick={() => removeOnePacked(index)}
+                        disabled={!canRemoveOnePacked}
+                        className={`grid ${actionButtonSize} place-items-center rounded-lg border border-red-200 bg-white text-red-700 shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
+                        aria-label={`Remove one packed quantity from ${item.productName || "product"}`}
+                        title="Unpack 1 qty"
+                      >
+                        <Minus size={actionIconSize} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => manualPack(index)}
+                        disabled={!canManualPack}
+                        className={`grid ${actionButtonSize} place-items-center rounded-lg bg-leaf text-white shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
+                        aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
+                        title="Only 1 qty packed"
+                      >
+                        <Plus size={actionIconSize} />
                       </button>
                     </div>
                   </div>
