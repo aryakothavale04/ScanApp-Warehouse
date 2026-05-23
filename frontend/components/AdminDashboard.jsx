@@ -9,6 +9,13 @@ import StoreBrand from "./StoreBrand";
 import Toast from "./Toast";
 import UploadInvoice from "./UploadInvoice";
 
+function compareOrderSequence(left, right) {
+  const leftSequence = Number.isFinite(left?.orderSequence) ? left.orderSequence : Number.MAX_SAFE_INTEGER;
+  const rightSequence = Number.isFinite(right?.orderSequence) ? right.orderSequence : Number.MAX_SAFE_INTEGER;
+  if (leftSequence !== rightSequence) return leftSequence - rightSequence;
+  return new Date(left?.createdAt || 0).getTime() - new Date(right?.createdAt || 0).getTime();
+}
+
 export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
   const [trashedOrders, setTrashedOrders] = useState([]);
@@ -155,8 +162,9 @@ export default function AdminDashboard() {
   }, []);
 
   const stats = useMemo(() => {
-    const completedOrders = orders.filter((order) => order.packedStatus === "Completed" || order.packedStatus === "Packed");
-    const pendingOrders = orders.filter((order) => order.packedStatus !== "Completed" && order.packedStatus !== "Packed");
+    const orderedEntries = [...orders].sort(compareOrderSequence);
+    const completedOrders = orderedEntries.filter((order) => order.packedStatus === "Completed" || order.packedStatus === "Packed");
+    const pendingOrders = orderedEntries.filter((order) => order.packedStatus !== "Completed" && order.packedStatus !== "Packed");
     const pendingProductQuantity = pendingOrders.reduce((orderSum, order) => {
       const orderPendingQuantity = (order.items || []).reduce(
         (itemSum, item) => itemSum + Math.max((item.quantity || 0) - (item.packedQuantity || 0), 0),
