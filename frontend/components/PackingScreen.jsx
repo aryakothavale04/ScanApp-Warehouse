@@ -80,6 +80,7 @@ export default function PackingScreen({ orderId }) {
   const [partyNameOpen, setPartyNameOpen] = useState(false);
   const scanLoadingRef = useRef(false);
   const pendingScanQueueRef = useRef([]);
+  const packingActionQueueRef = useRef(Promise.resolve());
   const hardwareScanBufferRef = useRef("");
   const hardwareScanTimerRef = useRef(null);
   const lastWrongScanRef = useRef({ value: "", at: 0 });
@@ -200,49 +201,67 @@ export default function PackingScreen({ orderId }) {
     };
   }, [handleScan, scannerActive]);
 
+  const enqueuePackingAction = useCallback((action) => {
+    const queuedAction = packingActionQueueRef.current.then(action, action);
+    packingActionQueueRef.current = queuedAction.catch(() => {});
+    return queuedAction;
+  }, []);
+
   const handleUpdateItem = useCallback(async (itemIndex, item) => {
-    const data = await api.updateOrderItem(orderId, itemIndex, item);
-    replaceOrder(data.order);
-    setToast({ type: "success", message: data.message || "Item updated" });
-  }, [orderId, replaceOrder]);
+    return enqueuePackingAction(async () => {
+      const data = await api.updateOrderItem(orderId, itemIndex, item);
+      replaceOrder(data.order);
+      setToast({ type: "success", message: data.message || "Item updated" });
+    });
+  }, [enqueuePackingAction, orderId, replaceOrder]);
 
   const handleManualPackItem = useCallback(async (itemIndex) => {
-    const data = await api.manualPackOrderItem(orderId, itemIndex);
-    replaceOrder(data.order);
-    setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
-    setToast({ type: "success", message: data.message || "Item packed" });
-    playScanSound("correct");
-    window.navigator.vibrate?.(70);
-    setTimeout(() => setLastPackedItemId(null), 900);
-  }, [orderId, replaceOrder]);
+    return enqueuePackingAction(async () => {
+      const data = await api.manualPackOrderItem(orderId, itemIndex);
+      replaceOrder(data.order);
+      setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
+      setToast({ type: "success", message: data.message || "Item packed" });
+      playScanSound("correct");
+      window.navigator.vibrate?.(70);
+      setTimeout(() => setLastPackedItemId(null), 900);
+    });
+  }, [enqueuePackingAction, orderId, replaceOrder]);
 
   const handleManualPackFullItem = useCallback(async (itemIndex) => {
-    const data = await api.manualPackFullOrderItem(orderId, itemIndex);
-    replaceOrder(data.order);
-    setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
-    setToast({ type: "success", message: data.message || "Full quantity packed" });
-    playScanSound("complete");
-    window.navigator.vibrate?.([70, 40, 70]);
-    setTimeout(() => setLastPackedItemId(null), 900);
-  }, [orderId, replaceOrder]);
+    return enqueuePackingAction(async () => {
+      const data = await api.manualPackFullOrderItem(orderId, itemIndex);
+      replaceOrder(data.order);
+      setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
+      setToast({ type: "success", message: data.message || "Full quantity packed" });
+      playScanSound("complete");
+      window.navigator.vibrate?.([70, 40, 70]);
+      setTimeout(() => setLastPackedItemId(null), 900);
+    });
+  }, [enqueuePackingAction, orderId, replaceOrder]);
 
   const handleRemovePackedItem = useCallback(async (itemIndex) => {
-    const data = await api.removePackedOrderItem(orderId, itemIndex);
-    replaceOrder(data.order);
-    setToast({ type: "success", message: data.message || "Packed item removed" });
-  }, [orderId, replaceOrder]);
+    return enqueuePackingAction(async () => {
+      const data = await api.removePackedOrderItem(orderId, itemIndex);
+      replaceOrder(data.order);
+      setToast({ type: "success", message: data.message || "Packed item removed" });
+    });
+  }, [enqueuePackingAction, orderId, replaceOrder]);
 
   const handleRemoveOnePackedItem = useCallback(async (itemIndex) => {
-    const data = await api.removeOnePackedOrderItem(orderId, itemIndex);
-    replaceOrder(data.order);
-    setToast({ type: "success", message: data.message || "1 packed quantity removed" });
-  }, [orderId, replaceOrder]);
+    return enqueuePackingAction(async () => {
+      const data = await api.removeOnePackedOrderItem(orderId, itemIndex);
+      replaceOrder(data.order);
+      setToast({ type: "success", message: data.message || "1 packed quantity removed" });
+    });
+  }, [enqueuePackingAction, orderId, replaceOrder]);
 
   const handleDeleteItem = useCallback(async (itemIndex) => {
-    const data = await api.deleteOrderItem(orderId, itemIndex);
-    replaceOrder(data.order);
-    setToast({ type: "success", message: data.message || "Product moved to trash" });
-  }, [orderId, replaceOrder]);
+    return enqueuePackingAction(async () => {
+      const data = await api.deleteOrderItem(orderId, itemIndex);
+      replaceOrder(data.order);
+      setToast({ type: "success", message: data.message || "Product moved to trash" });
+    });
+  }, [enqueuePackingAction, orderId, replaceOrder]);
 
   const handleSavePartyName = useCallback(async () => {
     setSavingParty(true);
