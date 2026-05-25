@@ -552,4 +552,69 @@ describe("pdf parser", () => {
       ]
     );
   });
+
+  it("drops text item-code cells without merging them into item names", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "3",
+      "10/- SpriteSprite 10/-1 Rs 170 Rs 170",
+      "15",
+      "Sobisco Cream Orange 5/-Sobisco Cream Orange 31.8g1 Rs 52 Rs 52",
+      "23",
+      "Shaboo 1kgShaboo2 Rs 150 Rs 300",
+      "24",
+      "Kela Chips 1\u20442kgKela chips 1\u20442kg2 Rs 90 Rs 180",
+      "25",
+      "Kharidal 1kgKharidaal1 Rs 130 Rs 130"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        hsnOrBarcode: item.hsnOrBarcode,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 3, productName: "10/- Sprite", hsnOrBarcode: "", quantity: 1, pricePerUnit: 170, totalAmount: 170 },
+        { serialNo: 15, productName: "Sobisco Cream Orange 5/-", hsnOrBarcode: "", quantity: 1, pricePerUnit: 52, totalAmount: 52 },
+        { serialNo: 23, productName: "Shaboo 1kg", hsnOrBarcode: "", quantity: 2, pricePerUnit: 150, totalAmount: 300 },
+        { serialNo: 24, productName: "Kela Chips 1\u20442kg", hsnOrBarcode: "", quantity: 2, pricePerUnit: 90, totalAmount: 180 },
+        { serialNo: 25, productName: "Kharidal 1kg", hsnOrBarcode: "", quantity: 1, pricePerUnit: 130, totalAmount: 130 }
+      ]
+    );
+  });
+
+  it("splits compact pack price barcode and quantity cells", () => {
+    const items = extractItems([
+      "#Item nameItem codeQuantityPrice/ unitAmount",
+      "7",
+      "750ml Sprite Rs 3589017640329670.5 Rs 780 Rs 390",
+      "29",
+      "750ml Sprite Rs 35890176403296712 Rs 32.5 Rs 390",
+      "30",
+      "Comfert Rs 43 Rs 37 Rs 111",
+      "31",
+      "\u0935\u0938\u094d\u092a\u0930 XL Rs 4512 Rs 40 Rs 480"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        productName: item.productName,
+        hsnOrBarcode: item.hsnOrBarcode,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 7, productName: "750ml Sprite \u20b935", hsnOrBarcode: "8901764032967", quantity: 0.5, pricePerUnit: 780, totalAmount: 390 },
+        { serialNo: 29, productName: "750ml Sprite \u20b935", hsnOrBarcode: "8901764032967", quantity: 12, pricePerUnit: 32.5, totalAmount: 390 },
+        { serialNo: 30, productName: "Comfert \u20b94", hsnOrBarcode: "", quantity: 3, pricePerUnit: 37, totalAmount: 111 },
+        { serialNo: 31, productName: "\u0935\u0938\u094d\u092a\u0930 XL \u20b945", hsnOrBarcode: "", quantity: 12, pricePerUnit: 40, totalAmount: 480 }
+      ]
+    );
+  });
 });

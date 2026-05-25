@@ -249,6 +249,8 @@ function stripMergedTextItemCode(value = "") {
   for (const match of aliasMatches) {
     const index = match.index ?? -1;
     if (index <= 0) continue;
+    if (/^(?:XS|S|M|L|XL|XXL)\b/i.test(match[0] || "")) continue;
+    if (/^[A-Z]{1,4}\s*(?:\u20b9|â‚¹|Rs|INR)?\s*\d/i.test(match[0] || "")) continue;
 
     const before = text.slice(0, index);
     if (!hasIndicScript(before)) continue;
@@ -759,6 +761,69 @@ function makeStrictItem({
   };
 }
 
+function normalizeLooseText(value = "") {
+  return value
+    .toString()
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
+function similarityRatio(left = "", right = "") {
+  const first = normalizeLooseText(left);
+  const second = normalizeLooseText(right);
+  if (!first || !second) return 0;
+  const maxLength = Math.max(first.length, second.length);
+  const minLength = Math.min(first.length, second.length);
+  let matches = 0;
+  for (let index = 0; index < minLength; index += 1) {
+    if (first[index] === second[index]) matches += 1;
+  }
+  return matches / maxLength;
+}
+
+function removeMergedTextItemCode(value = "") {
+  const text = restoreDisplayCurrency(value);
+  const normalized = normalizeLooseText(text);
+  if (normalized.length < 6 || !hasLatin(text)) return text;
+
+  const candidates = [];
+  for (let index = 1; index < text.length - 1; index += 1) {
+    if (!/[A-Za-z]/.test(text[index] || "")) continue;
+    const previous = text[index - 1] || "";
+    const startsGluedWord = /[a-z]/.test(previous) && /[A-Z]/.test(text[index] || "");
+    const startsDelimitedWord = !/[A-Za-z]/.test(previous);
+    if (!startsGluedWord && !startsDelimitedWord) continue;
+
+    const left = text.slice(0, index).trim();
+    const right = text.slice(index).trim();
+    if (!left || !right || !hasLatin(right)) continue;
+
+    const leftWords = left.match(/[A-Za-z]{2,}/g) || [];
+    const rightWords = right.match(/[A-Za-z]{2,}/g) || [];
+    if (!leftWords.length || !rightWords.length) continue;
+
+    const firstRightWord = rightWords[0] || "";
+    const repeatedWord = leftWords.some((leftWord) => (
+      leftWord.toLowerCase() === firstRightWord.toLowerCase() ||
+      similarityRatio(leftWord, firstRightWord) >= 0.66
+    ));
+
+    const leftCompact = normalizeLooseText(left);
+    const rightCompact = normalizeLooseText(right);
+    const strongDuplicate = leftCompact.includes(rightCompact) || rightCompact.startsWith(leftCompact);
+
+    if (repeatedWord || strongDuplicate) {
+      candidates.push({ index, left, right, score: (strongDuplicate ? 2 : 0) + rightWords.length });
+    }
+  }
+
+  const selected = candidates
+    .sort((a, b) => a.index - b.index || b.score - a.score)[0];
+
+  return selected?.left || text;
+}
+
 function parseStrictAmountDetail(line = "") {
   const currencyMatches = [...line.matchAll(/(?:₹|Rs|INR)\s*([\d,]+(?:\.\d+)?)/gi)];
   if (currencyMatches.length < 2) return null;
@@ -818,7 +883,7 @@ function parseStrictAmountDetail(line = "") {
     const selected = candidates.sort((left, right) => {
       const leftLeadingZero = left.barcode.startsWith("0") ? 1 : 0;
       const rightLeadingZero = right.barcode.startsWith("0") ? 1 : 0;
-      return leftLeadingZero - rightLeadingZero || right.barcode.length - left.barcode.length || right.packPrice.length - left.packPrice.length;
+      return leftLeadingZero - rightLeadingZero || right.packPrice.length - left.packPrice.length || right.barcode.length - left.barcode.length;
     })[0];
 
     if (selected) {
@@ -828,6 +893,36 @@ function parseStrictAmountDetail(line = "") {
         pricePerUnit,
         totalAmount,
         codeColumnText: `${beforePrice.slice(0, compactPackBarcodeQuantity.index)}₹${selected.packPrice}`.trim()
+      };
+    }
+  }
+
+  const compactPackBarcodeDecimalQuantity = beforePrice.match(/(?:â‚¹|Rs|INR)\s*(\d{8,21}\.\d+)$/i);
+  if (compactPackBarcodeDecimalQuantity) {
+    const compactNumber = compactPackBarcodeDecimalQuantity[1];
+    const decimalIndex = compactNumber.indexOf(".");
+    const candidates = [];
+    for (let packLength = 1; packLength <= Math.min(3, decimalIndex - 6); packLength += 1) {
+      const packPrice = compactNumber.slice(0, packLength);
+      const packPriceValue = toNumber(packPrice);
+      if (!Number.isFinite(packPriceValue) || packPriceValue <= 0 || packPriceValue > 100) continue;
+      const barcode = compactNumber.slice(packLength, decimalIndex - 1);
+      const quantity = toNumber(compactNumber.slice(decimalIndex - 1));
+      if (isValidBarcode(barcode) && Number.isFinite(quantity) && quantity > 0) {
+        candidates.push({ packPrice, barcode, quantity });
+      }
+    }
+
+    const selected = candidates
+      .sort((left, right) => right.packPrice.length - left.packPrice.length || right.barcode.length - left.barcode.length)[0];
+
+    if (selected) {
+      return {
+        barcode: selected.barcode,
+        quantity: selected.quantity,
+        pricePerUnit,
+        totalAmount,
+        codeColumnText: `${beforePrice.slice(0, compactPackBarcodeDecimalQuantity.index)}\u20b9${selected.packPrice}`.trim()
       };
     }
   }
@@ -891,12 +986,13 @@ function parseStrictAmountDetail(line = "") {
   const compactCurrencyQuantity = beforePrice.match(/(?:₹|Rs|INR)\s*(\d{2,8})$/i);
   if (compactCurrencyQuantity) {
     const split = chooseQuantitySplit(compactCurrencyQuantity[1]);
+    const packPriceText = split?.prefixDigits ? `\u20b9${split.prefixDigits}` : "";
     return {
       barcode: "",
       quantity: split?.quantity || 0,
       pricePerUnit,
       totalAmount,
-      codeColumnText: beforePrice.slice(0, compactCurrencyQuantity.index).trim()
+      codeColumnText: `${beforePrice.slice(0, compactCurrencyQuantity.index)}${packPriceText}`.trim()
     };
   }
 
@@ -969,7 +1065,7 @@ function parseStrictRowGroup(group, detailCache) {
   const itemNameParts = pickStrictItemNameParts(parts, detailIndex);
   const itemName = itemNameParts.length
     ? itemNameParts.join(" ")
-    : restoreDisplayCurrency(detail.codeColumnText);
+    : removeMergedTextItemCode(detail.codeColumnText);
 
   return makeStrictItem({
     serialNo: group.serialNo,
