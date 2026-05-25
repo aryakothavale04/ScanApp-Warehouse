@@ -90,6 +90,12 @@ export default function PackingScreen({ orderId }) {
     if (nextOrder) setPartyName(nextOrder.customerName || "");
   }, []);
 
+  const showPackingError = useCallback((message) => {
+    setToast({ type: "error", message });
+    playScanSound("wrong");
+    window.navigator.vibrate?.([80, 40, 80]);
+  }, []);
+
   const loadOrder = useCallback(async () => {
     setLoading(true);
     try {
@@ -363,7 +369,7 @@ export default function PackingScreen({ orderId }) {
       onRemovePacked={handleRemovePackedItem}
       onUpdateItem={handleUpdateItem}
       onDeleteItem={handleDeleteItem}
-      onError={(message) => setToast({ type: "error", message })}
+      onError={showPackingError}
       scanningMode={scannerActive}
     />
   );
