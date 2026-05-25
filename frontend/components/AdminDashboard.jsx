@@ -267,8 +267,14 @@ export default function AdminDashboard() {
                   <ListOrdered size={15} />
                   Sequence
                 </button>
-                <button onClick={loadOrders} className="min-h-9 rounded-lg border border-black/10 px-3 py-1.5 text-xs font-semibold dark:border-white/10 sm:min-h-10 sm:text-sm">
-                  Refresh
+                <button
+                  onClick={loadOrders}
+                  disabled={loading}
+                  aria-busy={loading ? "true" : undefined}
+                  className="flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-black/10 px-3 py-1.5 text-xs font-semibold disabled:opacity-60 dark:border-white/10 sm:min-h-10 sm:text-sm"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={15} /> : null}
+                  {loading ? "Refreshing..." : "Refresh"}
                 </button>
               </div>
             </div>
@@ -412,10 +418,11 @@ export default function AdminDashboard() {
               <button
                 type="submit"
                 disabled={sequenceSaving}
+                aria-busy={sequenceSaving ? "true" : undefined}
                 className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
                 {sequenceSaving ? <Loader2 className="animate-spin" size={16} /> : <ListOrdered size={16} />}
-                Change
+                {sequenceSaving ? "Changing..." : "Change"}
               </button>
             </div>
           </form>

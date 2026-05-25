@@ -136,6 +136,7 @@ export default function TrashPage() {
               type="button"
               onClick={() => setEmptyOpen(true)}
               disabled={busyId === "empty-trash"}
+              aria-busy={busyId === "empty-trash" ? "true" : undefined}
               className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 shadow-sm disabled:opacity-60 dark:border-red-900/70 dark:bg-[#151f1a] dark:text-red-300 sm:w-auto sm:min-w-32"
             >
               {busyId === "empty-trash" ? <Loader2 className="animate-spin" size={15} /> : <Trash2 size={15} />}
@@ -184,10 +185,11 @@ export default function TrashPage() {
                         type="button"
                         onClick={() => restoreOrder(order._id)}
                         disabled={busyId === order._id}
+                        aria-busy={busyId === order._id ? "true" : undefined}
                         className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
                       >
                         {busyId === order._id ? <Loader2 className="animate-spin" size={15} /> : <RotateCcw size={15} />}
-                        Restore
+                        {busyId === order._id ? "Restoring..." : "Restore"}
                       </button>
                       <button
                         type="button"
@@ -238,10 +240,11 @@ export default function TrashPage() {
                           type="button"
                           onClick={() => restoreItem(item)}
                           disabled={busyId === itemBusyId}
+                          aria-busy={busyId === itemBusyId ? "true" : undefined}
                           className="flex min-h-10 items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-xs font-bold text-white disabled:opacity-60"
                         >
                           {busyId === itemBusyId ? <Loader2 className="animate-spin" size={15} /> : <RotateCcw size={15} />}
-                          Restore
+                          {busyId === itemBusyId ? "Restoring..." : "Restore"}
                         </button>
                         <button
                           type="button"
@@ -293,10 +296,11 @@ export default function TrashPage() {
                 type="button"
                 onClick={() => permanentlyDeleteOrder(deleteOrder._id)}
                 disabled={busyId === deleteOrder._id}
+                aria-busy={busyId === deleteOrder._id ? "true" : undefined}
                 className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
                 {busyId === deleteOrder._id ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                Delete
+                {busyId === deleteOrder._id ? "Deleting..." : "Delete"}
               </button>
             </div>
           </section>
@@ -324,10 +328,11 @@ export default function TrashPage() {
                 type="button"
                 onClick={() => permanentlyDeleteItem(deleteItem)}
                 disabled={busyId === `${deleteItem.orderId}-${deleteItem.originalIndex}`}
+                aria-busy={busyId === `${deleteItem.orderId}-${deleteItem.originalIndex}` ? "true" : undefined}
                 className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
                 {busyId === `${deleteItem.orderId}-${deleteItem.originalIndex}` ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                Delete
+                {busyId === `${deleteItem.orderId}-${deleteItem.originalIndex}` ? "Deleting..." : "Delete"}
               </button>
             </div>
           </section>
@@ -355,10 +360,11 @@ export default function TrashPage() {
                 type="button"
                 onClick={emptyTrash}
                 disabled={busyId === "empty-trash"}
+                aria-busy={busyId === "empty-trash" ? "true" : undefined}
                 className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
                 {busyId === "empty-trash" ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                Empty
+                {busyId === "empty-trash" ? "Emptying..." : "Empty"}
               </button>
             </div>
           </section>

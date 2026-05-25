@@ -35,10 +35,11 @@ export default function UploadInvoice({ onUploaded, onToast }) {
       <button
         onClick={() => inputRef.current?.click()}
         disabled={loading}
+        aria-busy={loading ? "true" : undefined}
         className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:min-h-12 sm:px-4 sm:py-3 sm:text-base"
       >
         {loading ? <Loader2 className="animate-spin" size={18} /> : <FileUp size={18} />}
-        Vyapar PDF Upload
+        {loading ? "Uploading..." : "Vyapar PDF Upload"}
       </button>
     </section>
   );

@@ -321,6 +321,7 @@ export default function PendingProductsPage() {
             type="button"
             onClick={handleDownloadPdf}
             disabled={loading || downloadingPdf || !pendingProducts.length}
+            aria-busy={downloadingPdf ? "true" : undefined}
             className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-11 sm:w-fit sm:px-4"
             aria-label="Download pending products PDF"
             title="Download PDF"

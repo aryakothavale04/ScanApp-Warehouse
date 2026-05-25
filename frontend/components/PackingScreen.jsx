@@ -533,10 +533,11 @@ export default function PackingScreen({ orderId }) {
               <button
                 type="submit"
                 disabled={addingItem}
+                aria-busy={addingItem ? "true" : undefined}
                 className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
                 {addingItem ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-                Add
+                {addingItem ? "Adding..." : "Add"}
               </button>
             </div>
           </form>
@@ -589,10 +590,11 @@ export default function PackingScreen({ orderId }) {
               <button
                 type="submit"
                 disabled={savingParty}
+                aria-busy={savingParty ? "true" : undefined}
                 className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
                 {savingParty ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                Save
+                {savingParty ? "Saving..." : "Save"}
               </button>
             </div>
           </form>

@@ -131,6 +131,7 @@ function OrderCard({ order, onDelete, compact = false, sequenceNumber, onSequenc
             type="button"
             onClick={() => setDeleteOpen(true)}
             disabled={deleting || moving}
+            aria-busy={deleting ? "true" : undefined}
             className={`${compact ? "grid h-9 w-9 place-items-center rounded-lg border border-red-200 text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40" : "flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"}`}
             aria-label={`Move invoice ${order.invoiceNo} to trash`}
             title="Move to trash"
@@ -170,10 +171,11 @@ function OrderCard({ order, onDelete, compact = false, sequenceNumber, onSequenc
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
+                aria-busy={deleting ? "true" : undefined}
                 className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
                 {deleting ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                Move
+                {deleting ? "Moving..." : "Move"}
               </button>
             </div>
           </div>

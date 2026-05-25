@@ -34,6 +34,33 @@ button {
   touch-action: manipulation;
 }
 
+:where(button, a[href]) {
+  transition-duration: 140ms;
+  transition-property: transform, filter, box-shadow, background-color, border-color, color, opacity;
+  transition-timing-function: ease;
+}
+
+:where(button:not(:disabled), a[href]):active {
+  filter: brightness(0.96);
+  transform: translateY(1px) scale(0.985);
+}
+
+button[aria-busy="true"] {
+  cursor: progress;
+  overflow: hidden;
+  position: relative;
+}
+
+button[aria-busy="true"]::after {
+  animation: busy-sheen 1.15s ease-in-out infinite;
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.26) 48%, transparent 76%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
 input, select {
   font-size: 16px;
 }
@@ -46,6 +73,20 @@ input, select {
   0% { transform: scale(0.86); opacity: 0.45; }
   70% { transform: scale(1.08); opacity: 1; }
   100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes busy-sheen {
+  100% { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, a[href]) {
+    transition-duration: 1ms;
+  }
+
+  button[aria-busy="true"]::after {
+    animation: none;
+  }
 }
 
 .safe-bottom {

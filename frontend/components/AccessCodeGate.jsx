@@ -94,6 +94,7 @@ export default function AccessCodeGate({ children }) {
           <button
             type="submit"
             disabled={checking}
+            aria-busy={checking ? "true" : undefined}
             className="mt-4 min-h-11 w-full rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
           >
             {checking ? "Checking..." : "Open App"}

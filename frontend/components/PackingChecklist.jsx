@@ -143,6 +143,13 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
           const canRemoveOnePacked = (item.packedQuantity || 0) > 0;
           const actionButtonSize = scanningMode ? "h-7 w-7 sm:h-8 sm:w-8" : "h-9 w-9";
           const actionIconSize = scanningMode ? 14 : 16;
+          const actionBusy = Boolean(busyAction);
+          const saveBusy = busyAction === `save-${index}`;
+          const deleteBusy = busyAction === `delete-${index}`;
+          const packBusy = busyAction === `pack-${index}`;
+          const packFullBusy = busyAction === `pack-full-${index}`;
+          const removeBusy = busyAction === `remove-${index}`;
+          const removeOneBusy = busyAction === `remove-one-${index}`;
 
           return (
             <article
@@ -186,6 +193,7 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                   {!scanningMode && (
                     <button
                       onClick={() => (isEditing ? cancelEditing() : startEditing(index, item))}
+                      disabled={actionBusy}
                       className="grid h-8 w-8 place-items-center rounded-lg border border-black/10 bg-white text-black/70 sm:h-10 sm:w-10"
                       aria-label={isEditing ? "Cancel edit" : "Edit item"}
                       title={isEditing ? "Cancel edit" : "Edit item"}
@@ -196,12 +204,13 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                     <button
                       type="button"
                       onClick={() => setDeleteTarget({ index, item })}
-                      disabled={busyAction === `delete-${index}`}
+                      disabled={actionBusy}
+                      aria-busy={deleteBusy ? "true" : undefined}
                       className={`grid place-items-center border border-red-200 bg-white text-red-700 transition hover:bg-red-50 disabled:opacity-60 dark:border-red-900/70 dark:text-red-300 ${scanningMode ? "h-7 w-7 rounded-full sm:h-8 sm:w-8" : "h-8 w-8 rounded-lg sm:h-10 sm:w-10"}`}
                       aria-label={`Move ${item.productName || "product"} to trash`}
                       title="Move product to trash"
                     >
-                      {busyAction === `delete-${index}` ? <Loader2 className="animate-spin" size={actionIconSize} /> : <Trash2 size={actionIconSize} />}
+                      {deleteBusy ? <Loader2 className="animate-spin" size={actionIconSize} /> : <Trash2 size={actionIconSize} />}
                     </button>
                   </>
                   <div className={`grid place-items-center rounded-full ${scanningMode ? "h-7 w-7 sm:h-8 sm:w-8" : "h-8 w-8 sm:h-10 sm:w-10"} ${done ? "bg-emerald-600 text-white" : "bg-black/5 text-black/40 dark:bg-white/10 dark:text-white/50"}`}>
@@ -268,32 +277,35 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                     {isEditing && (
                       <button
                         onClick={() => saveItem(index)}
-                        disabled={busyAction === `save-${index}`}
+                        disabled={actionBusy}
+                        aria-busy={saveBusy ? "true" : undefined}
                         className="flex min-h-9 items-center gap-1.5 rounded-lg bg-leaf px-2.5 py-1.5 text-xs font-bold text-white disabled:opacity-60 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm"
                       >
-                        <Save size={16} />
-                        Save item
+                        {saveBusy ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                        {saveBusy ? "Saving..." : "Save item"}
                       </button>
                     )}
                       <button
                         type="button"
                         onClick={() => manualPackFull(index)}
-                        disabled={!canManualPack}
+                        disabled={actionBusy || !canManualPack}
+                        aria-busy={packFullBusy ? "true" : undefined}
                         className={`grid ${actionButtonSize} place-items-center rounded-lg bg-emerald-600 text-white shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
                         aria-label={`Mark full quantity packed for ${item.productName || "product"}`}
                         title="Full qty packed"
                       >
-                        <CheckCheck size={actionIconSize} />
+                        {packFullBusy ? <Loader2 className="animate-spin" size={actionIconSize} /> : <CheckCheck size={actionIconSize} />}
                       </button>
                       <button
                         type="button"
                         onClick={() => removePacked(index)}
-                        disabled={!canRemoveOnePacked}
+                        disabled={actionBusy || !canRemoveOnePacked}
+                        aria-busy={removeBusy ? "true" : undefined}
                         className={`grid ${actionButtonSize} place-items-center rounded-lg border border-red-200 bg-white text-red-700 shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
                         aria-label={`Reset packed quantity for ${item.productName || "product"}`}
                         title="Reset packed"
                       >
-                        <X size={actionIconSize} />
+                        {removeBusy ? <Loader2 className="animate-spin" size={actionIconSize} /> : <X size={actionIconSize} />}
                       </button>
                     </div>
 
@@ -301,22 +313,24 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                       <button
                         type="button"
                         onClick={() => removeOnePacked(index)}
-                        disabled={!canRemoveOnePacked}
+                        disabled={actionBusy || !canRemoveOnePacked}
+                        aria-busy={removeOneBusy ? "true" : undefined}
                         className={`grid ${actionButtonSize} place-items-center rounded-lg border border-red-200 bg-white text-red-700 shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
                         aria-label={`Remove one packed quantity from ${item.productName || "product"}`}
                         title="Unpack 1 qty"
                       >
-                        <Minus size={actionIconSize} />
+                        {removeOneBusy ? <Loader2 className="animate-spin" size={actionIconSize} /> : <Minus size={actionIconSize} />}
                       </button>
                       <button
                         type="button"
                         onClick={() => manualPack(index)}
-                        disabled={!canManualPack}
+                        disabled={actionBusy || !canManualPack}
+                        aria-busy={packBusy ? "true" : undefined}
                         className={`grid ${actionButtonSize} place-items-center rounded-lg bg-leaf text-white shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
                         aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
                         title="Only 1 qty packed"
                       >
-                        <Plus size={actionIconSize} />
+                        {packBusy ? <Loader2 className="animate-spin" size={actionIconSize} /> : <Plus size={actionIconSize} />}
                       </button>
                     </div>
                   </div>
@@ -364,10 +378,11 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                 type="button"
                 onClick={deleteItem}
                 disabled={busyAction === `delete-${deleteTarget.index}`}
+                aria-busy={busyAction === `delete-${deleteTarget.index}` ? "true" : undefined}
                 className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
                 {busyAction === `delete-${deleteTarget.index}` ? <Loader2 className="animate-spin" size={16} /> : <Trash2 size={16} />}
-                Move
+                {busyAction === `delete-${deleteTarget.index}` ? "Moving..." : "Move"}
               </button>
             </div>
           </section>
