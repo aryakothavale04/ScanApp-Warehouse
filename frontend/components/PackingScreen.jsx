@@ -8,6 +8,7 @@ import PackingChecklist from "./PackingChecklist";
 import ProgressRing from "./ProgressRing";
 import StoreBrand from "./StoreBrand";
 import Toast from "./Toast";
+import ToastHistoryButton from "./ToastHistoryButton";
 
 let scanAudioContext;
 
@@ -70,6 +71,7 @@ export default function PackingScreen({ orderId }) {
   const [scannerActive, setScannerActive] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [toast, setToast] = useState(null);
+  const [toastHistory, setToastHistory] = useState([]);
   const [lastPackedItemId, setLastPackedItemId] = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [partyName, setPartyName] = useState("");
@@ -90,11 +92,25 @@ export default function PackingScreen({ orderId }) {
     if (nextOrder) setPartyName(nextOrder.customerName || "");
   }, []);
 
+  const showToast = useCallback((nextToast) => {
+    setToast(nextToast);
+    if (!nextToast?.message) return;
+
+    setToastHistory((current) => [
+      {
+        ...nextToast,
+        id: `${Date.now()}-${current.length}`,
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      },
+      ...current
+    ].slice(0, 30));
+  }, []);
+
   const showPackingError = useCallback((message) => {
-    setToast({ type: "error", message });
+    showToast({ type: "error", message });
     playScanSound("wrong");
     window.navigator.vibrate?.([80, 40, 80]);
-  }, []);
+  }, [showToast]);
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
@@ -102,11 +118,11 @@ export default function PackingScreen({ orderId }) {
       const data = await api.order(orderId);
       replaceOrder(data.order);
     } catch (error) {
-      setToast({ type: "error", message: error.message });
+      showToast({ type: "error", message: error.message });
     } finally {
       setLoading(false);
     }
-  }, [orderId, replaceOrder]);
+  }, [orderId, replaceOrder, showToast]);
 
   useEffect(() => {
     loadOrder();
@@ -135,7 +151,7 @@ export default function PackingScreen({ orderId }) {
           const data = await api.scan(orderId, nextBarcode);
           replaceOrder(data.order);
           setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
-          setToast({ type: "success", message: data.message || "Item packed" });
+          showToast({ type: "success", message: data.message || "Item packed" });
           const completedQuantity = data.message === "Qty completed" || data.message === "Order completed";
           playScanSound(completedQuantity ? "complete" : "correct");
           window.navigator.vibrate?.(70);
@@ -146,7 +162,7 @@ export default function PackingScreen({ orderId }) {
           const isRepeatWrongScan = lastWrongScanRef.current.value === scannedValue && now - lastWrongScanRef.current.at < 2500;
           lastWrongScanRef.current = { value: scannedValue, at: now };
 
-          setToast({ type: "error", message: error.message });
+          showToast({ type: "error", message: error.message });
           if (!isRepeatWrongScan) {
             playScanSound("wrong");
             window.navigator.vibrate?.([80, 40, 80]);
@@ -159,7 +175,7 @@ export default function PackingScreen({ orderId }) {
       scanLoadingRef.current = false;
       setScanLoading(false);
     }
-  }, [orderId, replaceOrder]);
+  }, [orderId, replaceOrder, showToast]);
 
   useEffect(() => {
     if (!scannerActive) return undefined;
@@ -216,54 +232,54 @@ export default function PackingScreen({ orderId }) {
   const handleUpdateItem = useCallback(async (itemIndex, item) => {
     const data = await api.updateOrderItem(orderId, itemIndex, item);
     replaceOrder(data.order);
-    setToast({ type: "success", message: data.message || "Item updated" });
-  }, [orderId, replaceOrder]);
+    showToast({ type: "success", message: data.message || "Item updated" });
+  }, [orderId, replaceOrder, showToast]);
 
   const handleManualPackItem = useCallback(async (itemIndex) => {
     return enqueuePackingAction(async () => {
       const data = await api.manualPackOrderItem(orderId, itemIndex);
       replaceOrder(data.order);
       setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
-      setToast({ type: "success", message: data.message || "Item packed" });
+      showToast({ type: "success", message: data.message || "Item packed" });
       playScanSound("correct");
       window.navigator.vibrate?.(70);
       setTimeout(() => setLastPackedItemId(null), 900);
     });
-  }, [enqueuePackingAction, orderId, replaceOrder]);
+  }, [enqueuePackingAction, orderId, replaceOrder, showToast]);
 
   const handleManualPackFullItem = useCallback(async (itemIndex) => {
     return enqueuePackingAction(async () => {
       const data = await api.manualPackFullOrderItem(orderId, itemIndex);
       replaceOrder(data.order);
       setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
-      setToast({ type: "success", message: data.message || "Full quantity packed" });
+      showToast({ type: "success", message: data.message || "Full quantity packed" });
       playScanSound("complete");
       window.navigator.vibrate?.([70, 40, 70]);
       setTimeout(() => setLastPackedItemId(null), 900);
     });
-  }, [enqueuePackingAction, orderId, replaceOrder]);
+  }, [enqueuePackingAction, orderId, replaceOrder, showToast]);
 
   const handleRemovePackedItem = useCallback(async (itemIndex) => {
     return enqueuePackingAction(async () => {
       const data = await api.removePackedOrderItem(orderId, itemIndex);
       replaceOrder(data.order);
-      setToast({ type: "success", message: data.message || "Packed item removed" });
+      showToast({ type: "success", message: data.message || "Packed item removed" });
     });
-  }, [enqueuePackingAction, orderId, replaceOrder]);
+  }, [enqueuePackingAction, orderId, replaceOrder, showToast]);
 
   const handleRemoveOnePackedItem = useCallback(async (itemIndex) => {
     return enqueuePackingAction(async () => {
       const data = await api.removeOnePackedOrderItem(orderId, itemIndex);
       replaceOrder(data.order);
-      setToast({ type: "success", message: data.message || "1 packed quantity removed" });
+      showToast({ type: "success", message: data.message || "1 packed quantity removed" });
     });
-  }, [enqueuePackingAction, orderId, replaceOrder]);
+  }, [enqueuePackingAction, orderId, replaceOrder, showToast]);
 
   const handleDeleteItem = useCallback(async (itemIndex) => {
     const data = await api.deleteOrderItem(orderId, itemIndex);
     replaceOrder(data.order);
-    setToast({ type: "success", message: data.message || "Product moved to trash" });
-  }, [orderId, replaceOrder]);
+    showToast({ type: "success", message: data.message || "Product moved to trash" });
+  }, [orderId, replaceOrder, showToast]);
 
   const handleSavePartyName = useCallback(async () => {
     setSavingParty(true);
@@ -271,13 +287,13 @@ export default function PackingScreen({ orderId }) {
       const data = await api.updateOrder(orderId, { customerName: partyName });
       replaceOrder(data.order);
       setPartyNameOpen(false);
-      setToast({ type: "success", message: data.message || "Party name updated" });
+      showToast({ type: "success", message: data.message || "Party name updated" });
     } catch (error) {
-      setToast({ type: "error", message: error.message });
+      showToast({ type: "error", message: error.message });
     } finally {
       setSavingParty(false);
     }
-  }, [orderId, partyName, replaceOrder]);
+  }, [orderId, partyName, replaceOrder, showToast]);
 
   const handleAddItem = useCallback(async (event) => {
     event.preventDefault();
@@ -287,13 +303,13 @@ export default function PackingScreen({ orderId }) {
       replaceOrder(data.order);
       setItemDraft({ productName: "", hsnOrBarcode: "", quantity: 1, pricePerUnit: "" });
       setAddItemOpen(false);
-      setToast({ type: "success", message: data.message || "Item added" });
+      showToast({ type: "success", message: data.message || "Item added" });
     } catch (error) {
-      setToast({ type: "error", message: error.message });
+      showToast({ type: "error", message: error.message });
     } finally {
       setAddingItem(false);
     }
-  }, [itemDraft, orderId, replaceOrder]);
+  }, [itemDraft, orderId, replaceOrder, showToast]);
 
   if (loading) {
     return (
@@ -339,14 +355,17 @@ export default function PackingScreen({ orderId }) {
     </button>
   );
   const addItemButton = (
-    <button
-      type="button"
-      onClick={() => setAddItemOpen(true)}
-      className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-leaf/30 bg-white px-3 py-2 text-sm font-bold text-leaf shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a] sm:min-h-11 sm:px-4"
-    >
-      <Plus size={17} />
-      Add Item
-    </button>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setAddItemOpen(true)}
+        className="flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border border-leaf/30 bg-white px-3 py-2 text-sm font-bold text-leaf shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a] sm:min-h-11 sm:px-4"
+      >
+        <Plus size={17} />
+        Add Item
+      </button>
+      <ToastHistoryButton messages={toastHistory} />
+    </div>
   );
   const scanner = scannerActive && cameraActive ? (
     <BarcodeScanner
@@ -354,7 +373,7 @@ export default function PackingScreen({ orderId }) {
       compact
       onScan={handleScan}
       onError={(message) => {
-        setToast({ type: "error", message });
+        showToast({ type: "error", message });
         playScanSound("wrong");
       }}
     />
@@ -397,6 +416,7 @@ export default function PackingScreen({ orderId }) {
               >
                 {cameraActive ? <Square size={15} /> : <Camera size={15} />}
               </button>
+              <ToastHistoryButton messages={toastHistory} className="h-8 w-8 sm:h-9 sm:w-9" />
               <button
                 onClick={() => {
                   setScannerActive(false);

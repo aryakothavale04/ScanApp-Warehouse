@@ -7,6 +7,7 @@ import { api, clearStoredAccessCode } from "@/src/lib/api";
 import OrderCard from "./OrderCard";
 import StoreBrand from "./StoreBrand";
 import Toast from "./Toast";
+import ToastHistoryButton from "./ToastHistoryButton";
 import UploadInvoice from "./UploadInvoice";
 
 function compareOrderSequence(left, right) {
@@ -28,6 +29,21 @@ export default function AdminDashboard() {
   const [sequenceSaving, setSequenceSaving] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const [toastHistory, setToastHistory] = useState([]);
+
+  function showToast(nextToast) {
+    setToast(nextToast);
+    if (!nextToast?.message) return;
+
+    setToastHistory((current) => [
+      {
+        ...nextToast,
+        id: `${Date.now()}-${current.length}`,
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      },
+      ...current
+    ].slice(0, 30));
+  }
 
   async function loadOrders() {
     setLoading(true);
@@ -36,7 +52,7 @@ export default function AdminDashboard() {
       setOrders(ordersData.orders || []);
       setTrashedOrders(trashData.orders || []);
     } catch (error) {
-      setToast({ type: "error", message: error.message });
+      showToast({ type: "error", message: error.message });
     } finally {
       setLoading(false);
     }
@@ -47,9 +63,9 @@ export default function AdminDashboard() {
       await api.deleteOrder(orderToDelete._id);
       setOrders((currentOrders) => currentOrders.filter((order) => order._id !== orderToDelete._id));
       setTrashedOrders((currentTrash) => [{ ...orderToDelete, trashedAt: new Date().toISOString() }, ...currentTrash]);
-      setToast({ type: "success", message: "Order moved to trash" });
+      showToast({ type: "success", message: "Order moved to trash" });
     } catch (error) {
-      setToast({ type: "error", message: error.message });
+      showToast({ type: "error", message: error.message });
       throw error;
     }
   }
@@ -81,9 +97,9 @@ export default function AdminDashboard() {
     try {
       const data = await api.updateOrderSequence(nextOrders.map((order) => order._id));
       setOrders(data.orders || nextOrders);
-      setToast({ type: "success", message: "Order sequence updated" });
+      showToast({ type: "success", message: "Order sequence updated" });
     } catch (error) {
-      setToast({ type: "error", message: error.message });
+      showToast({ type: "error", message: error.message });
       loadOrders();
     } finally {
       setMovingOrderId(null);
@@ -95,7 +111,7 @@ export default function AdminDashboard() {
     const currentGroupIndex = groupOrders.findIndex((order) => order._id === orderToMove._id);
 
     if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= groupOrders.length) {
-      setToast({ type: "error", message: `Enter a sequence number between 1 and ${groupOrders.length}` });
+      showToast({ type: "error", message: `Enter a sequence number between 1 and ${groupOrders.length}` });
       return false;
     }
 
@@ -121,10 +137,10 @@ export default function AdminDashboard() {
     try {
       const data = await api.updateOrderSequence(nextOrders.map((order) => order._id));
       setOrders(data.orders || nextOrders);
-      setToast({ type: "success", message: "Order sequence updated" });
+      showToast({ type: "success", message: "Order sequence updated" });
       return true;
     } catch (error) {
-      setToast({ type: "error", message: error.message });
+      showToast({ type: "error", message: error.message });
       loadOrders();
       return false;
     } finally {
@@ -253,7 +269,7 @@ export default function AdminDashboard() {
 
         <div className="grid gap-3 lg:gap-4">
           <div>
-            <UploadInvoice onUploaded={loadOrders} onToast={setToast} />
+            <UploadInvoice onUploaded={loadOrders} onToast={showToast} />
           </div>
           <section>
             <div className="mb-1.5 flex items-center justify-between gap-2">
@@ -343,13 +359,16 @@ export default function AdminDashboard() {
           )}
         </section>
         <section className="mt-5 border-t border-black/10 pt-4 dark:border-white/10 sm:mt-6">
-          <button
-            type="button"
-            onClick={() => setLogoutOpen(true)}
-            className="min-h-11 w-full rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 shadow-sm dark:border-red-900/70 dark:bg-[#151f1a] dark:text-red-300 sm:w-auto"
-          >
-            Log Out
-          </button>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setLogoutOpen(true)}
+              className="min-h-11 flex-1 rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 shadow-sm dark:border-red-900/70 dark:bg-[#151f1a] dark:text-red-300 sm:flex-none"
+            >
+              Log Out
+            </button>
+            <ToastHistoryButton messages={toastHistory} />
+          </div>
         </section>
       </div>
       {logoutOpen && (
