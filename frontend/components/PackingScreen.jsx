@@ -208,12 +208,10 @@ export default function PackingScreen({ orderId }) {
   }, []);
 
   const handleUpdateItem = useCallback(async (itemIndex, item) => {
-    return enqueuePackingAction(async () => {
-      const data = await api.updateOrderItem(orderId, itemIndex, item);
-      replaceOrder(data.order);
-      setToast({ type: "success", message: data.message || "Item updated" });
-    });
-  }, [enqueuePackingAction, orderId, replaceOrder]);
+    const data = await api.updateOrderItem(orderId, itemIndex, item);
+    replaceOrder(data.order);
+    setToast({ type: "success", message: data.message || "Item updated" });
+  }, [orderId, replaceOrder]);
 
   const handleManualPackItem = useCallback(async (itemIndex) => {
     return enqueuePackingAction(async () => {
@@ -256,12 +254,10 @@ export default function PackingScreen({ orderId }) {
   }, [enqueuePackingAction, orderId, replaceOrder]);
 
   const handleDeleteItem = useCallback(async (itemIndex) => {
-    return enqueuePackingAction(async () => {
-      const data = await api.deleteOrderItem(orderId, itemIndex);
-      replaceOrder(data.order);
-      setToast({ type: "success", message: data.message || "Product moved to trash" });
-    });
-  }, [enqueuePackingAction, orderId, replaceOrder]);
+    const data = await api.deleteOrderItem(orderId, itemIndex);
+    replaceOrder(data.order);
+    setToast({ type: "success", message: data.message || "Product moved to trash" });
+  }, [orderId, replaceOrder]);
 
   const handleSavePartyName = useCallback(async () => {
     setSavingParty(true);

@@ -65,47 +65,19 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
   }
 
   async function manualPack(index) {
-    try {
-      setBusyAction(`pack-${index}`);
-      await onManualPack(index);
-    } catch (error) {
-      onError?.(error.message);
-    } finally {
-      setBusyAction(null);
-    }
+    onManualPack(index).catch((error) => onError?.(error.message));
   }
 
   async function manualPackFull(index) {
-    try {
-      setBusyAction(`pack-full-${index}`);
-      await onManualPackFull(index);
-    } catch (error) {
-      onError?.(error.message);
-    } finally {
-      setBusyAction(null);
-    }
+    onManualPackFull(index).catch((error) => onError?.(error.message));
   }
 
   async function removePacked(index) {
-    try {
-      setBusyAction(`remove-${index}`);
-      await onRemovePacked(index);
-    } catch (error) {
-      onError?.(error.message);
-    } finally {
-      setBusyAction(null);
-    }
+    onRemovePacked(index).catch((error) => onError?.(error.message));
   }
 
   async function removeOnePacked(index) {
-    try {
-      setBusyAction(`remove-one-${index}`);
-      await onRemoveOnePacked(index);
-    } catch (error) {
-      onError?.(error.message);
-    } finally {
-      setBusyAction(null);
-    }
+    onRemoveOnePacked(index).catch((error) => onError?.(error.message));
   }
 
   async function deleteItem() {
@@ -146,10 +118,6 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
           const actionBusy = Boolean(busyAction);
           const saveBusy = busyAction === `save-${index}`;
           const deleteBusy = busyAction === `delete-${index}`;
-          const packBusy = busyAction === `pack-${index}`;
-          const packFullBusy = busyAction === `pack-full-${index}`;
-          const removeBusy = busyAction === `remove-${index}`;
-          const removeOneBusy = busyAction === `remove-one-${index}`;
 
           return (
             <article
@@ -288,24 +256,22 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                       <button
                         type="button"
                         onClick={() => manualPackFull(index)}
-                        disabled={actionBusy || !canManualPack}
-                        aria-busy={packFullBusy ? "true" : undefined}
-                        className={`grid ${actionButtonSize} place-items-center rounded-lg bg-emerald-600 text-white shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
+                        disabled={!canManualPack}
+                        className={`grid ${actionButtonSize} place-items-center rounded-lg bg-emerald-600 text-white shadow-sm transition active:scale-95 disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
                         aria-label={`Mark full quantity packed for ${item.productName || "product"}`}
                         title="Full qty packed"
                       >
-                        {packFullBusy ? <Loader2 className="animate-spin" size={actionIconSize} /> : <CheckCheck size={actionIconSize} />}
+                        <CheckCheck size={actionIconSize} />
                       </button>
                       <button
                         type="button"
                         onClick={() => removePacked(index)}
-                        disabled={actionBusy || !canRemoveOnePacked}
-                        aria-busy={removeBusy ? "true" : undefined}
-                        className={`grid ${actionButtonSize} place-items-center rounded-lg border border-red-200 bg-white text-red-700 shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
+                        disabled={!canRemoveOnePacked}
+                        className={`grid ${actionButtonSize} place-items-center rounded-lg border border-red-200 bg-white text-red-700 shadow-sm transition active:scale-95 disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
                         aria-label={`Reset packed quantity for ${item.productName || "product"}`}
                         title="Reset packed"
                       >
-                        {removeBusy ? <Loader2 className="animate-spin" size={actionIconSize} /> : <X size={actionIconSize} />}
+                        <X size={actionIconSize} />
                       </button>
                     </div>
 
@@ -313,24 +279,22 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                       <button
                         type="button"
                         onClick={() => removeOnePacked(index)}
-                        disabled={actionBusy || !canRemoveOnePacked}
-                        aria-busy={removeOneBusy ? "true" : undefined}
-                        className={`grid ${actionButtonSize} place-items-center rounded-lg border border-red-200 bg-white text-red-700 shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
+                        disabled={!canRemoveOnePacked}
+                        className={`grid ${actionButtonSize} place-items-center rounded-lg border border-red-200 bg-white text-red-700 shadow-sm transition active:scale-95 disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
                         aria-label={`Remove one packed quantity from ${item.productName || "product"}`}
                         title="Unpack 1 qty"
                       >
-                        {removeOneBusy ? <Loader2 className="animate-spin" size={actionIconSize} /> : <Minus size={actionIconSize} />}
+                        <Minus size={actionIconSize} />
                       </button>
                       <button
                         type="button"
                         onClick={() => manualPack(index)}
-                        disabled={actionBusy || !canManualPack}
-                        aria-busy={packBusy ? "true" : undefined}
-                        className={`grid ${actionButtonSize} place-items-center rounded-lg bg-leaf text-white shadow-sm transition disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
+                        disabled={!canManualPack}
+                        className={`grid ${actionButtonSize} place-items-center rounded-lg bg-leaf text-white shadow-sm transition active:scale-95 disabled:opacity-35 ${scanningMode ? "rounded-full" : ""}`}
                         aria-label={`Add one packed quantity for ${item.productName || "product"} manually`}
                         title="Only 1 qty packed"
                       >
-                        {packBusy ? <Loader2 className="animate-spin" size={actionIconSize} /> : <Plus size={actionIconSize} />}
+                        <Plus size={actionIconSize} />
                       </button>
                     </div>
                   </div>
