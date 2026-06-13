@@ -617,4 +617,74 @@ describe("pdf parser", () => {
       ]
     );
   });
+
+  it("parses column-rendered continuation pages and wrapped price rows", () => {
+    const items = extractItems([
+      "#\tItem name\tItem code\tQuantity\tAmount",
+      "unit",
+      "33 Sobisco Maggi 5/-\t8902351111157\t2\tRs 48\tRs 96",
+      "Rs",
+      "34 250ml Sprite Rs20\t8901764032912\t14\tRs 250",
+      "17.86",
+      "Rs",
+      "35 250ml Thums Up Rs20\t8901764042911\t14\tRs 250",
+      "17.86",
+      "36 Blade Rk\t8906167130258\t1\tRs 42\tRs 42",
+      "Total\t31\tRs 638"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        itemName: item.itemName,
+        itemCode: item.itemCode,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 33, itemName: "Sobisco Maggi 5/-", itemCode: "8902351111157", quantity: 2, pricePerUnit: 48, totalAmount: 96 },
+        { serialNo: 34, itemName: "250ml Sprite ₹20", itemCode: "8901764032912", quantity: 14, pricePerUnit: 17.86, totalAmount: 250 },
+        { serialNo: 35, itemName: "250ml Thums Up ₹20", itemCode: "8901764042911", quantity: 14, pricePerUnit: 17.86, totalAmount: 250 },
+        { serialNo: 36, itemName: "Blade Rk", itemCode: "8906167130258", quantity: 1, pricePerUnit: 42, totalAmount: 42 }
+      ]
+    );
+  });
+
+  it("keeps wrapped item names with split decimal prices in serial order", () => {
+    const items = extractItems([
+      "#\tItem name\tItem code\tQuantity\tAmount",
+      "Rs20 Butterscotch Cone\tRs",
+      "2\t1\tRs 400.8",
+      "80ml\t400.8",
+      "4\tRs10 Choco Crunch 30ml\t1 Rs 270\tRs 270",
+      "Rs10 Strawberry Crunch",
+      "5\t1 Rs 270\tRs 270",
+      "30ml",
+      "Rs",
+      "13 Rs35 Choco Nut Bar 70ml\t1 642.9 Rs 642.95",
+      "5",
+      "Rs50 Black And White Cone",
+      "14\t1 Rs 425\tRs 425",
+      "120ml",
+      "Total\t4\tRs 1738.75"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        itemName: item.itemName,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 2, itemName: "₹20 Butterscotch Cone 80ml", quantity: 1, pricePerUnit: 400.8, totalAmount: 400.8 },
+        { serialNo: 4, itemName: "₹10 Choco Crunch 30ml", quantity: 1, pricePerUnit: 270, totalAmount: 270 },
+        { serialNo: 5, itemName: "₹10 Strawberry Crunch 30ml", quantity: 1, pricePerUnit: 270, totalAmount: 270 },
+        { serialNo: 13, itemName: "₹35 Choco Nut Bar 70ml", quantity: 1, pricePerUnit: 642.95, totalAmount: 642.95 },
+        { serialNo: 14, itemName: "₹50 Black And White Cone 120ml", quantity: 1, pricePerUnit: 425, totalAmount: 425 }
+      ]
+    );
+  });
 });
