@@ -1329,6 +1329,7 @@ function isOrphanAmountFragment(line = "") {
 }
 
 function isTableNoiseLine(line = "") {
+  if (/\b(?:www\.vyaparapp\.in|vyaparapp\.in)\b/i.test(restoreDisplayCurrency(line))) return true;
   return /^(?:unit|price\/?|page\s+\d+|invoice|₹|Rs|INR)$/i.test(restoreDisplayCurrency(line));
 }
 
@@ -1420,7 +1421,10 @@ function parseSeparatedVyaparRows(lines) {
 
   for (const line of section) {
     if (/^invoice$/i.test(line) || isItemTableHeaderLine(line)) continue;
-    if (isTableNoiseLine(line)) continue;
+    if (isTableNoiseLine(line)) {
+      pendingParts = [];
+      continue;
+    }
 
     if (
       current &&

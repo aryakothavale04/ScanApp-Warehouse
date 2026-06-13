@@ -679,6 +679,34 @@ describe("pdf parser", () => {
     );
   });
 
+  it("drops footer markers before the next page table row", () => {
+    const items = extractItems([
+      "#\tItem name\tItem code\tQuantity\tAmount",
+      "29\t10/- Sprite\t38613355690\t1\tRs 170\tRs 170",
+      "www.vyaparapp.in",
+      "Page 1",
+      "#\tItem name\tItem code\tQuantity\tAmount",
+      "unit",
+      "30\tSA Shev Bundi 5/-\t38658899723\t3\tRs 52\tRs 156",
+      "Total\t4\tRs 326"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        itemName: item.itemName,
+        itemCode: item.itemCode,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 29, itemName: "10/- Sprite", itemCode: "38613355690", quantity: 1, pricePerUnit: 170, totalAmount: 170 },
+        { serialNo: 30, itemName: "SA Shev Bundi 5/-", itemCode: "38658899723", quantity: 3, pricePerUnit: 52, totalAmount: 156 }
+      ]
+    );
+  });
+
   it("keeps wrapped item names with split decimal prices in serial order", () => {
     const items = extractItems([
       "#\tItem name\tItem code\tQuantity\tAmount",
