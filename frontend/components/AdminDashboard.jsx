@@ -24,7 +24,6 @@ export default function AdminDashboard() {
   const [sequenceMode, setSequenceMode] = useState(false);
   const [movingOrderId, setMovingOrderId] = useState(null);
   const [sequenceTarget, setSequenceTarget] = useState(null);
-  const [sequenceGroup, setSequenceGroup] = useState("pending");
   const [sequenceDraft, setSequenceDraft] = useState("");
   const [sequenceSaving, setSequenceSaving] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -76,19 +75,13 @@ export default function AdminDashboard() {
   }
 
   async function moveOrder(orderToMove, direction) {
-    const groupCompleted = orderToMove.packedStatus === "Completed" || orderToMove.packedStatus === "Packed";
-    const groupOrderIds = orders
-      .filter((order) => (order.packedStatus === "Completed" || order.packedStatus === "Packed") === groupCompleted)
-      .map((order) => order._id);
-    const currentGroupIndex = groupOrderIds.indexOf(orderToMove._id);
-    const nextGroupIndex = direction === "up" ? currentGroupIndex - 1 : currentGroupIndex + 1;
+    const orderIds = stats.orderedOrders.map((order) => order._id);
+    const currentIndex = orderIds.indexOf(orderToMove._id);
+    const nextIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
 
-    if (currentGroupIndex < 0 || nextGroupIndex < 0 || nextGroupIndex >= groupOrderIds.length) return;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= orderIds.length) return;
 
-    const nextOrders = [...orders];
-    const currentIndex = nextOrders.findIndex((order) => order._id === groupOrderIds[currentGroupIndex]);
-    const nextIndex = nextOrders.findIndex((order) => order._id === groupOrderIds[nextGroupIndex]);
-    if (currentIndex < 0 || nextIndex < 0) return;
+    const nextOrders = [...stats.orderedOrders];
 
     [nextOrders[currentIndex], nextOrders[nextIndex]] = [nextOrders[nextIndex], nextOrders[currentIndex]];
     setOrders(nextOrders);
@@ -106,30 +99,21 @@ export default function AdminDashboard() {
     }
   }
 
-  async function moveOrderToSequence(orderToMove, targetSequence, groupOrders = stats.pendingOrders) {
+  async function moveOrderToSequence(orderToMove, targetSequence) {
     const targetIndex = Number.parseInt(targetSequence, 10) - 1;
-    const currentGroupIndex = groupOrders.findIndex((order) => order._id === orderToMove._id);
+    const currentIndex = stats.orderedOrders.findIndex((order) => order._id === orderToMove._id);
 
-    if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= groupOrders.length) {
-      showToast({ type: "error", message: `Enter a sequence number between 1 and ${groupOrders.length}` });
+    if (!Number.isInteger(targetIndex) || targetIndex < 0 || targetIndex >= stats.orderedOrders.length) {
+      showToast({ type: "error", message: `Enter a sequence number between 1 and ${stats.orderedOrders.length}` });
       return false;
     }
 
-    if (currentGroupIndex < 0) return false;
-    if (currentGroupIndex === targetIndex) return true;
+    if (currentIndex < 0) return false;
+    if (currentIndex === targetIndex) return true;
 
-    const reorderedGroupIds = groupOrders.map((order) => order._id);
-    const [movedId] = reorderedGroupIds.splice(currentGroupIndex, 1);
-    reorderedGroupIds.splice(targetIndex, 0, movedId);
-
-    const groupIdSet = new Set(reorderedGroupIds);
-    let nextGroupIndex = 0;
-    const nextOrders = orders.map((order) => {
-      if (!groupIdSet.has(order._id)) return order;
-      const nextId = reorderedGroupIds[nextGroupIndex];
-      nextGroupIndex += 1;
-      return orders.find((entry) => entry._id === nextId) || order;
-    });
+    const nextOrders = [...stats.orderedOrders];
+    const [movedOrder] = nextOrders.splice(currentIndex, 1);
+    nextOrders.splice(targetIndex, 0, movedOrder);
 
     setOrders(nextOrders);
     setMovingOrderId(orderToMove._id);
@@ -148,9 +132,8 @@ export default function AdminDashboard() {
     }
   }
 
-  function openSequenceEditor(order, sequenceNumber, group = "pending") {
+  function openSequenceEditor(order, sequenceNumber) {
     setSequenceTarget(order);
-    setSequenceGroup(group);
     setSequenceDraft(String(sequenceNumber));
   }
 
@@ -159,13 +142,11 @@ export default function AdminDashboard() {
     if (!sequenceTarget || sequenceSaving) return;
 
     setSequenceSaving(true);
-    const groupOrders = sequenceGroup === "completed" ? stats.completedOrders : stats.pendingOrders;
-    const moved = await moveOrderToSequence(sequenceTarget, sequenceDraft, groupOrders);
+    const moved = await moveOrderToSequence(sequenceTarget, sequenceDraft);
     setSequenceSaving(false);
 
     if (moved) {
       setSequenceTarget(null);
-      setSequenceGroup("pending");
       setSequenceDraft("");
     }
   }
@@ -190,6 +171,7 @@ export default function AdminDashboard() {
     }, 0);
 
     return {
+      orderedOrders: orderedEntries,
       pendingOrders,
       completedOrders,
       pendingOrderCount: pendingOrders.length,
@@ -215,7 +197,7 @@ export default function AdminDashboard() {
       color: "bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-100"
     },
     {
-      href: "#completed-orders",
+      href: "#orders",
       label: "Completed Orders",
       value: stats.completedOrderCount,
       icon: CheckCircle2,
@@ -229,9 +211,6 @@ export default function AdminDashboard() {
       color: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-100"
     }
   ];
-  const sequenceGroupOrders = sequenceGroup === "completed" ? stats.completedOrders : stats.pendingOrders;
-  const sequenceGroupLabel = sequenceGroup === "completed" ? "completed" : "pending";
-
   return (
     <main className="min-h-screen safe-bottom">
       <Toast toast={toast} onClose={() => setToast(null)} />
@@ -271,9 +250,9 @@ export default function AdminDashboard() {
           <div>
             <UploadInvoice onUploaded={loadOrders} onToast={showToast} />
           </div>
-          <section>
+          <section id="orders">
             <div className="mb-1.5 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-bold sm:text-base">Pending Orders</h2>
+              <h2 className="text-sm font-bold sm:text-base">Orders</h2>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -302,62 +281,31 @@ export default function AdminDashboard() {
               </div>
             ) : (
               <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2">
-                {stats.pendingOrders.map((order, index) => (
+                {stats.orderedOrders.map((order, index) => (
                   <OrderCard
                     key={order._id}
                     order={order}
                     onDelete={deleteOrder}
                     compact
                     sequenceNumber={index + 1}
-                    onSequenceClick={(entry) => openSequenceEditor(entry, index + 1, "pending")}
+                    onSequenceClick={(entry) => openSequenceEditor(entry, index + 1)}
                     sequenceControls={sequenceMode}
                     onMoveUp={(entry) => moveOrder(entry, "up")}
                     onMoveDown={(entry) => moveOrder(entry, "down")}
                     canMoveUp={index > 0}
-                    canMoveDown={index < stats.pendingOrders.length - 1}
+                    canMoveDown={index < stats.orderedOrders.length - 1}
                     moving={Boolean(movingOrderId)}
                   />
                 ))}
-                {!stats.pendingOrders.length && (
+                {!stats.orderedOrders.length && (
                   <div className="rounded-lg bg-white p-6 text-center text-sm text-black/55 dark:bg-[#151f1a] dark:text-white/55">
-                    No pending orders.
+                    No orders.
                   </div>
                 )}
               </div>
             )}
           </section>
         </div>
-        <section id="completed-orders" className="mt-4 sm:mt-6">
-          <div className="mb-1.5 flex items-center justify-between">
-            <h2 className="text-sm font-bold sm:text-base">Completed Orders</h2>
-            {movingOrderId && <Loader2 className="animate-spin text-leaf" size={17} />}
-          </div>
-          {loading ? null : (
-            <div className="grid gap-1.5 sm:grid-cols-2 sm:gap-2 lg:grid-cols-3">
-              {stats.completedOrders.map((order, index) => (
-                <OrderCard
-                  key={order._id}
-                  order={order}
-                  onDelete={deleteOrder}
-                  compact
-                  sequenceNumber={index + 1}
-                  onSequenceClick={(entry) => openSequenceEditor(entry, index + 1, "completed")}
-                  sequenceControls={sequenceMode}
-                  onMoveUp={(entry) => moveOrder(entry, "up")}
-                  onMoveDown={(entry) => moveOrder(entry, "down")}
-                  canMoveUp={index > 0}
-                  canMoveDown={index < stats.completedOrders.length - 1}
-                  moving={Boolean(movingOrderId)}
-                />
-              ))}
-              {!stats.completedOrders.length && (
-                <div className="rounded-lg bg-white p-6 text-center text-sm text-black/55 dark:bg-[#151f1a] dark:text-white/55">
-                  No completed orders.
-                </div>
-              )}
-            </div>
-          )}
-        </section>
         <section className="mt-5 border-t border-black/10 pt-4 dark:border-white/10 sm:mt-6">
           <div className="flex items-center justify-between gap-2">
             <button
@@ -405,7 +353,7 @@ export default function AdminDashboard() {
             <div className="mb-4">
               <h2 className="text-lg font-black">Change Sequence</h2>
               <p className="mt-1 text-sm text-black/60 dark:text-white/60">
-                Move invoice <span className="font-bold text-black dark:text-white">{sequenceTarget.invoiceNo}</span> to {sequenceGroupLabel} sequence number.
+                Move invoice <span className="font-bold text-black dark:text-white">{sequenceTarget.invoiceNo}</span> to sequence number.
               </p>
             </div>
             <label className="mb-4 block">
@@ -413,7 +361,7 @@ export default function AdminDashboard() {
               <input
                 type="number"
                 min="1"
-                max={sequenceGroupOrders.length}
+                max={stats.orderedOrders.length}
                 step="1"
                 autoFocus
                 value={sequenceDraft}
@@ -426,7 +374,6 @@ export default function AdminDashboard() {
                 type="button"
                 onClick={() => {
                   setSequenceTarget(null);
-                  setSequenceGroup("pending");
                   setSequenceDraft("");
                 }}
                 disabled={sequenceSaving}

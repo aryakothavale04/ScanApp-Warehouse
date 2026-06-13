@@ -15,6 +15,9 @@ function OrderCard({ order, onDelete, compact = false, sequenceNumber, onSequenc
   const completed = order.packedStatus === "Completed" || order.packedStatus === "Packed";
   const statusLabel = completed ? "Completed" : order.packedStatus;
   const percent = totals.totalQuantity ? Math.min(100, Math.round((totals.packedQuantity / totals.totalQuantity) * 100)) : 0;
+  const cardTone = completed
+    ? "border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/35"
+    : "border-black/10 bg-white dark:border-white/10 dark:bg-[#151f1a]";
 
   async function handleDelete() {
     setDeleting(true);
@@ -30,7 +33,7 @@ function OrderCard({ order, onDelete, compact = false, sequenceNumber, onSequenc
 
   return (
     <>
-      <article className={`rounded-lg border border-black/10 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft dark:border-white/10 dark:bg-[#151f1a] ${compact ? "p-2.5 sm:p-3" : "p-4"}`}>
+      <article className={`rounded-lg border shadow-sm transition hover:-translate-y-0.5 hover:shadow-soft ${cardTone} ${compact ? "p-2.5 sm:p-3" : "p-4"}`}>
         <div className={compact ? "flex items-start gap-2" : ""}>
         <Link href={`/orders/${order._id}`} className="block min-w-0 flex-1">
           <div className={`flex items-start justify-between gap-2 sm:gap-3 ${compact ? "mb-2" : "mb-4"}`}>
