@@ -773,6 +773,32 @@ function cleanCodeCell(value = "") {
   return isValidBarcode(compact) ? compact : "";
 }
 
+function splitTabularNameAndBarcode(codeColumns = []) {
+  const columns = codeColumns.map((column) => restoreDisplayCurrency(column).trim()).filter(Boolean);
+  const lastColumnBarcode = cleanCodeCell(columns.at(-1) || "");
+  if (lastColumnBarcode) {
+    return {
+      barcode: lastColumnBarcode,
+      codeColumnText: columns.slice(0, -1).join(" ").trim()
+    };
+  }
+
+  if (columns.length === 1) {
+    const trailingBarcode = columns[0].match(/^(.+?)\s+(\d{6,14})$/);
+    if (trailingBarcode) {
+      return {
+        barcode: trailingBarcode[2],
+        codeColumnText: trailingBarcode[1].trim()
+      };
+    }
+  }
+
+  return {
+    barcode: "",
+    codeColumnText: columns[0] || ""
+  };
+}
+
 function makeStrictItem({
   serialNo,
   itemName = "",
@@ -880,14 +906,13 @@ function parseStrictAmountDetail(line = "") {
   const amountFromLastColumn = toNumber(columns.at(-1));
   const quantityPriceMatch = columns.at(-2)?.match(/^(\d+(?:\.\d+)?)\s*(?:₹|Rs|INR|â‚¹)\s*([\d,]+(?:\.\d+)?)$/i);
   if (columns.length >= 3 && quantityPriceMatch && Number.isFinite(amountFromLastColumn) && amountFromLastColumn > 0) {
-    const codeColumns = columns.slice(0, -2);
-    const barcode = cleanCodeCell(codeColumns.at(-1) || "");
+    const detailColumns = splitTabularNameAndBarcode(columns.slice(0, -2));
     return {
-      barcode,
+      barcode: detailColumns.barcode,
       quantity: toNumber(quantityPriceMatch[1]),
       pricePerUnit: toNumber(quantityPriceMatch[2]),
       totalAmount: amountFromLastColumn,
-      codeColumnText: barcode ? codeColumns.slice(0, -1).join(" ").trim() : codeColumns.join(" ").trim()
+      codeColumnText: detailColumns.codeColumnText
     };
   }
 
@@ -895,14 +920,13 @@ function parseStrictAmountDetail(line = "") {
     const combinedMoney = [...columns.at(-1).matchAll(/(?:₹|Rs|INR|â‚¹)?\s*([\d,]+(?:\.\d+)?)/gi)];
     const combinedQuantity = toNumber(columns.at(-2));
     if (combinedMoney.length >= 2 && Number.isFinite(combinedQuantity) && combinedQuantity > 0) {
-      const codeColumns = columns.slice(0, -2);
-      const barcode = cleanCodeCell(codeColumns.at(-1) || "");
+      const detailColumns = splitTabularNameAndBarcode(columns.slice(0, -2));
       return {
-        barcode,
+        barcode: detailColumns.barcode,
         quantity: combinedQuantity,
         pricePerUnit: toNumber(combinedMoney.at(-2)[1]),
         totalAmount: toNumber(combinedMoney.at(-1)[1]),
-        codeColumnText: barcode ? codeColumns.slice(0, -1).join(" ").trim() : codeColumns.join(" ").trim()
+        codeColumnText: detailColumns.codeColumnText
       };
     }
 
@@ -910,14 +934,13 @@ function parseStrictAmountDetail(line = "") {
     const pricePerUnit = toNumber(columns.at(-2));
     const quantity = toNumber(columns.at(-3));
     if (Number.isFinite(quantity) && quantity > 0 && quantity <= 100000 && Number.isFinite(pricePerUnit) && pricePerUnit > 0 && Number.isFinite(amount) && amount > 0) {
-      const codeColumns = columns.slice(0, -3);
-      const barcode = cleanCodeCell(codeColumns.at(-1) || "");
+      const detailColumns = splitTabularNameAndBarcode(columns.slice(0, -3));
       return {
-        barcode,
+        barcode: detailColumns.barcode,
         quantity,
         pricePerUnit,
         totalAmount: amount,
-        codeColumnText: barcode ? codeColumns.slice(0, -1).join(" ").trim() : codeColumns.join(" ").trim()
+        codeColumnText: detailColumns.codeColumnText
       };
     }
   }

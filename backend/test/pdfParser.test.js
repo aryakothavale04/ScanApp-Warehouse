@@ -651,6 +651,34 @@ describe("pdf parser", () => {
     );
   });
 
+  it("keeps trailing visual item-code barcodes out of item names", () => {
+    const items = extractItems([
+      "#\tItem name\tItem code\tQuantity\tPrice/ unit\tAmount",
+      "2\tSobisco Puff Strawberry 5/- 8902351997577\t2\tRs 52\tRs 104",
+      "3\tSobisco Cream Milk 5/-\t8902351998581\t2\tRs 52\tRs 104",
+      "6\tSobisco Cup Cake Mango 5/- 8902351777773\t1\tRs 52\tRs 52",
+      "7\tSobisco Cup Cake Vanilla 5/- 8902351333146\t1\tRs 52\tRs 52",
+      "Total\t6\tRs 312"
+    ]);
+
+    assert.deepEqual(
+      items.map((item) => ({
+        serialNo: item.serialNo,
+        itemName: item.itemName,
+        itemCode: item.itemCode,
+        quantity: item.quantity,
+        pricePerUnit: item.pricePerUnit,
+        totalAmount: item.totalAmount
+      })),
+      [
+        { serialNo: 2, itemName: "Sobisco Puff Strawberry 5/-", itemCode: "8902351997577", quantity: 2, pricePerUnit: 52, totalAmount: 104 },
+        { serialNo: 3, itemName: "Sobisco Cream Milk 5/-", itemCode: "8902351998581", quantity: 2, pricePerUnit: 52, totalAmount: 104 },
+        { serialNo: 6, itemName: "Sobisco Cup Cake Mango 5/-", itemCode: "8902351777773", quantity: 1, pricePerUnit: 52, totalAmount: 52 },
+        { serialNo: 7, itemName: "Sobisco Cup Cake Vanilla 5/-", itemCode: "8902351333146", quantity: 1, pricePerUnit: 52, totalAmount: 52 }
+      ]
+    );
+  });
+
   it("keeps wrapped item names with split decimal prices in serial order", () => {
     const items = extractItems([
       "#\tItem name\tItem code\tQuantity\tAmount",
