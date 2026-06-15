@@ -130,15 +130,38 @@ function extractContact(lines) {
   return match?.[0]?.replace(/\s+/g, "-") || "";
 }
 
+function cleanCustomerNameCandidate(value = "") {
+  const candidate = value
+    .toString()
+    .replace(/\binvoice\s*details\b.*$/i, "")
+    .replace(/\binvoice\s*(?:no|number|#)\s*\.?\s*[:\-#]?.*$/i, "")
+    .replace(/\bcontact\s*(?:no|number)?\s*\.?\s*[:\-#]?.*$/i, "")
+    .replace(/\b(?:invoice\s*)?date\s*[:\-#]?.*$/i, "")
+    .replace(/^[\s:|\-]+|[\s:|\-]+$/g, "")
+    .trim();
+
+  if (!candidate || /^(?:bill\s*to|invoice|invoice\s*details)$/i.test(candidate)) return "";
+  return candidate;
+}
+
 function extractCustomerName(lines) {
-  const billToIndex = lines.findIndex((line) => /^bill to$/i.test(line));
-  if (billToIndex >= 0 && lines[billToIndex + 1]) {
-    return lines[billToIndex + 1].trim();
+  const billToIndex = lines.findIndex((line) => /\bbill\s*to\b/i.test(line));
+  if (billToIndex >= 0) {
+    const billToLine = lines[billToIndex] || "";
+    const sameLineCandidate = cleanCustomerNameCandidate(
+      billToLine.replace(/^.*?\bbill\s*to\b\s*[:\-]?\s*/i, "")
+    );
+    if (sameLineCandidate) return sameLineCandidate;
+
+    for (let index = billToIndex + 1; index < Math.min(lines.length, billToIndex + 4); index += 1) {
+      const candidate = cleanCustomerNameCandidate(lines[index]);
+      if (candidate) return candidate;
+    }
   }
 
   const customerLine = lines.find((line) => /customer|party/i.test(line));
   const match = customerLine?.match(/(?:customer|party)\s*[:\-]?\s*(.+)$/i);
-  return match?.[1]?.trim() || "Walk-in Customer";
+  return cleanCustomerNameCandidate(match?.[1]) || "Walk-in Customer";
 }
 
 function toNumber(value) {
@@ -1709,5 +1732,6 @@ export const pdfParserInternals = {
   calculateInvoiceTotals,
   buildParserDiagnostics,
   normalizeTableHeaderLine,
+  extractCustomerName,
   renderPageWithColumns
 };

@@ -5,6 +5,7 @@ import { extractItems, pdfParserInternals } from "../src/services/pdfParser.js";
 const {
   buildParserDiagnostics,
   calculateInvoiceTotals,
+  extractCustomerName,
   isolateMultilingualName,
   normalizeTableHeaderLine,
   parseVyaparRow
@@ -150,6 +151,28 @@ describe("pdf parser", () => {
     assert.deepEqual(diagnostics.duplicateSerials, [3]);
     assert.deepEqual(diagnostics.fallbackRows, [3]);
     assert.equal(diagnostics.rowOrderPreserved, true);
+  });
+
+  it("extracts Bill To customer names when invoice details share the same header row", () => {
+    assert.equal(
+      extractCustomerName([
+        "Invoice",
+        "Bill To Invoice Details",
+        "Yelwankar Co. Invoice No.: 14192",
+        "Contact No.: 8850421719 Date: 15-06-2026"
+      ]),
+      "Yelwankar Co."
+    );
+
+    assert.equal(
+      extractCustomerName([
+        "Invoice",
+        "Bill To Invoice Details",
+        "Deep Kirana Invoice No.: 14193",
+        "Contact No.: 9049488280 Date: 15-06-2026"
+      ]),
+      "Deep Kirana"
+    );
   });
 
   it("extracts serial/native/detail rows from machine-readable Vyapar text", () => {
