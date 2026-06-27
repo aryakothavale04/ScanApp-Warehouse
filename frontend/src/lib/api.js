@@ -77,6 +77,14 @@ export const api = {
     request(`/api/orders/${id}`, "patch", {
       data: order
     }),
+  createPackingLocation: (orderId, location) =>
+    request(`/api/orders/${orderId}/packing-locations`, "post", {
+      data: location
+    }),
+  selectPackingLocation: (orderId, locationId) =>
+    request(`/api/orders/${orderId}/packing-locations/${locationId}/active`, "patch", {
+      data: {}
+    }),
   deleteOrder: (id) => request(`/api/orders/${id}`, "delete"),
   restoreOrder: (id) => request(`/api/orders/${id}/restore`, "post", {
     data: {}

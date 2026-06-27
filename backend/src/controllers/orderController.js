@@ -35,6 +35,13 @@ function serializeOrder(order, { includeDeletedItems = false } = {}) {
   const data = typeof order?.toObject === "function" ? order.toObject({ virtuals: true }) : order;
   if (!data) return data;
 
+  const packingLocations = data.packingLocations?.length ? data.packingLocations : [{
+    _id: data.activePackingLocationId || "default-tray-1",
+    type: "Tray",
+    number: 1,
+    label: "Tray 1"
+  }];
+  const activePackingLocationId = data.activePackingLocationId || packingLocations[0]?._id;
   const activeItems = getActiveItems(data.items || []);
   const deletedItems = (data.items || []).flatMap((item, originalIndex) => isItemTrashed(item) ? [{
     ...item,
@@ -47,6 +54,8 @@ function serializeOrder(order, { includeDeletedItems = false } = {}) {
 
   return {
     ...data,
+    packingLocations,
+    activePackingLocationId,
     items: includeDeletedItems ? data.items || [] : activeItems,
     deletedItems: includeDeletedItems ? deletedItems : undefined,
     progress: buildProgress(activeItems)
@@ -121,6 +130,66 @@ function isCompletedStatus(status) {
 function getProductId(value) {
   if (!value) return undefined;
   return value?._id || value;
+}
+
+function buildPackingLocationLabel(type, number) {
+  return `${type} ${number}`;
+}
+
+function ensureDefaultPackingLocation(order) {
+  if (!order.packingLocations?.length) {
+    order.packingLocations = [{
+      type: "Tray",
+      number: 1,
+      label: "Tray 1"
+    }];
+  }
+
+  const activeLocation = order.packingLocations.id?.(order.activePackingLocationId) || order.packingLocations[0];
+  order.activePackingLocationId = activeLocation?._id;
+  return activeLocation;
+}
+
+function getActivePackingLocation(order) {
+  return ensureDefaultPackingLocation(order);
+}
+
+function addPackedLocationQuantity(item, location, quantity = 1) {
+  if (!location || quantity <= 0) return;
+
+  const locationId = location._id?.toString();
+  const existing = (item.packingLocations || []).find((entry) => entry.locationId?.toString() === locationId);
+  if (existing) {
+    existing.quantity = (existing.quantity || 0) + quantity;
+    existing.label = location.label;
+    return;
+  }
+
+  item.packingLocations = item.packingLocations || [];
+  item.packingLocations.push({
+    locationId: location._id,
+    label: location.label,
+    quantity
+  });
+}
+
+function removePackedLocationQuantity(item, quantity = 1) {
+  if (!item.packingLocations?.length || quantity <= 0) return;
+
+  let remaining = quantity;
+  for (let index = item.packingLocations.length - 1; index >= 0 && remaining > 0; index -= 1) {
+    const entry = item.packingLocations[index];
+    const removeQuantity = Math.min(entry.quantity || 0, remaining);
+    entry.quantity = Math.max(0, (entry.quantity || 0) - removeQuantity);
+    remaining -= removeQuantity;
+    if (entry.quantity <= 0) {
+      item.packingLocations.splice(index, 1);
+    }
+  }
+}
+
+function clearPackedLocations(item) {
+  item.packingLocations = [];
 }
 
 function findOrderItemByScan(order, scannedValue) {
@@ -414,6 +483,58 @@ export async function updateOrder(req, res) {
   res.json({ message: "Party name updated", order: serializeOrder(order) });
 }
 
+export async function createPackingLocation(req, res) {
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const type = req.body?.type?.toString().trim();
+  const number = Number.parseInt(req.body?.number, 10);
+  if (!["Tray", "Box", "Bag"].includes(type)) {
+    return res.status(400).json({ message: "Location type must be Tray, Box, or Bag" });
+  }
+  if (!Number.isInteger(number) || number <= 0) {
+    return res.status(400).json({ message: "Location number must be greater than 0" });
+  }
+
+  ensureDefaultPackingLocation(order);
+  const label = buildPackingLocationLabel(type, number);
+  const existing = order.packingLocations.find((location) => location.type === type && location.number === number);
+  if (existing) {
+    order.activePackingLocationId = existing._id;
+    await order.save();
+    return res.json({ message: `${existing.label} selected`, order: serializeOrder(order) });
+  }
+
+  order.packingLocations.push({ type, number, label });
+  const location = order.packingLocations[order.packingLocations.length - 1];
+  order.activePackingLocationId = location._id;
+  await order.save();
+
+  res.status(201).json({ message: `${label} created`, order: serializeOrder(order) });
+}
+
+export async function selectPackingLocation(req, res) {
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  ensureDefaultPackingLocation(order);
+  const location = req.params.locationId === "default-tray-1"
+    ? order.packingLocations[0]
+    : order.packingLocations.id?.(req.params.locationId) || order.packingLocations.find((entry) => entry._id?.toString() === req.params.locationId);
+  if (!location) {
+    return res.status(404).json({ message: "Packing location not found" });
+  }
+
+  order.activePackingLocationId = location._id;
+  await order.save();
+
+  res.json({ message: `${location.label} selected`, order: serializeOrder(order) });
+}
+
 export async function addOrderItem(req, res) {
   const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
@@ -472,7 +593,11 @@ export async function updateOrderItem(req, res) {
   item.quantity = nextQuantity;
   item.pricePerUnit = Number.isFinite(Number(pricePerUnit)) ? Number(pricePerUnit) : 0;
   item.totalAmount = Number.isFinite(Number(totalAmount)) ? Number(totalAmount) : 0;
+  const previousPackedQuantity = item.packedQuantity || 0;
   item.packedQuantity = Math.min(item.packedQuantity, item.quantity);
+  if (item.packedQuantity < previousPackedQuantity) {
+    removePackedLocationQuantity(item, previousPackedQuantity - item.packedQuantity);
+  }
 
   order.recalculateStatus();
   await order.save();
@@ -493,6 +618,7 @@ export async function deleteOrderItem(req, res) {
 
   item.trashedAt = new Date();
   item.packedQuantity = 0;
+  clearPackedLocations(item);
   order.recalculateStatus();
   await order.save();
 
@@ -515,7 +641,10 @@ export async function manuallyPackOrderItem(req, res) {
   }
 
   const remainingQuantity = item.quantity - item.packedQuantity;
-  item.packedQuantity += Math.min(1, remainingQuantity);
+  const packedNow = Math.min(1, remainingQuantity);
+  const packingLocation = getActivePackingLocation(order);
+  item.packedQuantity += packedNow;
+  addPackedLocationQuantity(item, packingLocation, packedNow);
   order.recalculateStatus();
   await order.save();
 
@@ -524,7 +653,9 @@ export async function manuallyPackOrderItem(req, res) {
     productId: getProductId(item.productId),
     scannedAt: new Date(),
     scannedBy: req.body.scannedBy || "packing-staff",
-    barcode: "manual-missing-barcode"
+    barcode: "manual-missing-barcode",
+    packingLocationId: packingLocation._id,
+    packingLocationLabel: packingLocation.label
   });
 
   const itemCompleted = item.packedQuantity >= item.quantity;
@@ -550,7 +681,10 @@ export async function manuallyPackFullOrderItem(req, res) {
     return res.status(409).json({ message: `Qty completed: ${item.productName} is already fully packed` });
   }
 
+  const packedNow = item.quantity - item.packedQuantity;
+  const packingLocation = getActivePackingLocation(order);
   item.packedQuantity = item.quantity;
+  addPackedLocationQuantity(item, packingLocation, packedNow);
   order.recalculateStatus();
   await order.save();
 
@@ -559,7 +693,9 @@ export async function manuallyPackFullOrderItem(req, res) {
     productId: getProductId(item.productId),
     scannedAt: new Date(),
     scannedBy: req.body.scannedBy || "packing-staff",
-    barcode: "manual-full-quantity"
+    barcode: "manual-full-quantity",
+    packingLocationId: packingLocation._id,
+    packingLocationLabel: packingLocation.label
   });
 
   res.json({
@@ -580,8 +716,11 @@ export async function manuallyCompleteOrder(req, res) {
     return res.json({ message: "Order already completed", order: serializeOrder(order) });
   }
 
+  const packingLocation = getActivePackingLocation(order);
   changedItems.forEach((item) => {
+    const packedNow = Math.max((item.quantity || 0) - (item.packedQuantity || 0), 0);
     item.packedQuantity = item.quantity;
+    addPackedLocationQuantity(item, packingLocation, packedNow);
   });
 
   order.recalculateStatus();
@@ -592,7 +731,9 @@ export async function manuallyCompleteOrder(req, res) {
     productId: getProductId(item.productId),
     scannedAt: new Date(),
     scannedBy: req.body.scannedBy || "packing-staff",
-    barcode: normalizeBarcode(item.hsnOrBarcode || item.productId?.barcode) || "manual-order-complete"
+    barcode: normalizeBarcode(item.hsnOrBarcode || item.productId?.barcode) || "manual-order-complete",
+    packingLocationId: packingLocation._id,
+    packingLocationLabel: packingLocation.label
   })));
 
   res.json({
@@ -613,6 +754,7 @@ export async function removePackedOrderItem(req, res) {
   }
 
   item.packedQuantity = 0;
+  clearPackedLocations(item);
   order.recalculateStatus();
   await order.save();
 
@@ -648,6 +790,7 @@ export async function removeOnePackedOrderItem(req, res) {
   }
 
   item.packedQuantity = Math.max(0, (item.packedQuantity || 0) - 1);
+  removePackedLocationQuantity(item, 1);
   order.recalculateStatus();
   await order.save();
 
@@ -753,7 +896,10 @@ export async function scanBarcode(req, res) {
     }
 
     const remainingQuantity = item.quantity - item.packedQuantity;
-    item.packedQuantity += Math.min(1, remainingQuantity);
+    const packedNow = Math.min(1, remainingQuantity);
+    const packingLocation = getActivePackingLocation(order);
+    item.packedQuantity += packedNow;
+    addPackedLocationQuantity(item, packingLocation, packedNow);
     order.recalculateStatus();
     await order.save();
 
@@ -762,7 +908,9 @@ export async function scanBarcode(req, res) {
       productId: getProductId(item.productId),
       scannedAt: new Date(),
       scannedBy: scannedBy || "packing-staff",
-      barcode: scannedBarcode || scannedText
+      barcode: scannedBarcode || scannedText,
+      packingLocationId: packingLocation._id,
+      packingLocationLabel: packingLocation.label
     });
 
     const itemCompleted = item.packedQuantity >= item.quantity;

@@ -1,8 +1,9 @@
 "use client";
 
-import { Barcode, Camera, CheckCircle2, Loader2, Plus, Save, Square, UserRound, X } from "lucide-react";
+import { Barcode, Camera, CheckCircle2, ChevronDown, FileText, Loader2, MapPin, Plus, Save, Square, Truck, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/src/lib/api";
+import { openOrderSlip } from "@/src/lib/slips";
 import BarcodeScanner from "./BarcodeScanner";
 import PackingChecklist from "./PackingChecklist";
 import ProgressRing from "./ProgressRing";
@@ -80,6 +81,9 @@ export default function PackingScreen({ orderId }) {
   const [addingItem, setAddingItem] = useState(false);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [partyNameOpen, setPartyNameOpen] = useState(false);
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [locationDraft, setLocationDraft] = useState({ type: "Tray", number: "" });
+  const [savingLocation, setSavingLocation] = useState(false);
   const scanLoadingRef = useRef(false);
   const pendingScanQueueRef = useRef([]);
   const packingActionQueueRef = useRef(Promise.resolve());
@@ -131,6 +135,11 @@ export default function PackingScreen({ orderId }) {
   const progress = useMemo(() => {
     if (!order) return { packedQuantity: 0, totalQuantity: 0 };
     return order.progress;
+  }, [order]);
+
+  const activePackingLocation = useMemo(() => {
+    if (!order) return null;
+    return (order.packingLocations || []).find((location) => String(location._id) === String(order.activePackingLocationId)) || order.packingLocations?.[0] || null;
   }, [order]);
 
   const handleScan = useCallback(async (barcode) => {
@@ -311,6 +320,36 @@ export default function PackingScreen({ orderId }) {
     }
   }, [itemDraft, orderId, replaceOrder, showToast]);
 
+  const handleSelectPackingLocation = useCallback(async (locationId) => {
+    setSavingLocation(true);
+    try {
+      const data = await api.selectPackingLocation(orderId, locationId);
+      replaceOrder(data.order);
+      setLocationOpen(false);
+      showToast({ type: "success", message: data.message || "Packing location selected" });
+    } catch (error) {
+      showToast({ type: "error", message: error.message });
+    } finally {
+      setSavingLocation(false);
+    }
+  }, [orderId, replaceOrder, showToast]);
+
+  const handleCreatePackingLocation = useCallback(async (event) => {
+    event.preventDefault();
+    setSavingLocation(true);
+    try {
+      const data = await api.createPackingLocation(orderId, locationDraft);
+      replaceOrder(data.order);
+      setLocationDraft({ type: "Tray", number: "" });
+      setLocationOpen(false);
+      showToast({ type: "success", message: data.message || "Packing location created" });
+    } catch (error) {
+      showToast({ type: "error", message: error.message });
+    } finally {
+      setSavingLocation(false);
+    }
+  }, [locationDraft, orderId, replaceOrder, showToast]);
+
   if (loading) {
     return (
       <main className="grid min-h-screen place-items-center">
@@ -365,6 +404,40 @@ export default function PackingScreen({ orderId }) {
         Add Item
       </button>
       <ToastHistoryButton messages={toastHistory} />
+    </div>
+  );
+  const locationButton = (
+    <button
+      type="button"
+      onClick={() => setLocationOpen(true)}
+      className="flex min-h-11 w-full items-center gap-2 rounded-lg bg-white px-3 py-2 text-left shadow-sm transition hover:bg-leaf/5 dark:bg-[#151f1a] sm:min-h-12 sm:px-4"
+    >
+      <MapPin size={18} className="shrink-0 text-leaf" />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[11px] font-semibold text-black/50 dark:text-white/50 sm:text-xs">Active Packing Location</span>
+        <span className="block truncate text-sm font-black sm:text-base">{activePackingLocation?.label || "Tray 1"}</span>
+      </span>
+      <ChevronDown size={17} className="shrink-0 text-black/45 dark:text-white/45" />
+    </button>
+  );
+  const slipButtons = (
+    <div className="grid grid-cols-2 gap-2">
+      <button
+        type="button"
+        onClick={() => openOrderSlip(order, "packing")}
+        className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-bold shadow-sm dark:border-white/10 dark:bg-[#151f1a] sm:min-h-11 sm:text-sm"
+      >
+        <FileText size={16} />
+        Packing Slip
+      </button>
+      <button
+        type="button"
+        onClick={() => openOrderSlip(order, "delivery")}
+        className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-bold shadow-sm dark:border-white/10 dark:bg-[#151f1a] sm:min-h-11 sm:text-sm"
+      >
+        <Truck size={16} />
+        Delivery Slip
+      </button>
     </div>
   );
   const scanner = scannerActive && cameraActive ? (
@@ -447,6 +520,11 @@ export default function PackingScreen({ orderId }) {
             </div>
           </section>
         )}
+
+        <div className="mb-2.5 grid gap-2 sm:mb-4 sm:grid-cols-[1fr_auto]">
+          {locationButton}
+          <div className="sm:min-w-[290px]">{slipButtons}</div>
+        </div>
 
         {scannerActive ? (
           <div className="space-y-2">
@@ -563,6 +641,86 @@ export default function PackingScreen({ orderId }) {
               </button>
             </div>
           </form>
+        </div>
+      )}
+      {locationOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-2.5 sm:place-items-center sm:p-3">
+          <section className="w-full max-w-md rounded-lg bg-white p-3 shadow-soft dark:bg-[#151f1a] sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
+              <div>
+                <h2 className="text-base font-black sm:text-lg">Packing Location</h2>
+                <p className="text-xs text-black/55 dark:text-white/55">Scanned items go to the active location.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLocationOpen(false)}
+                className="grid h-9 w-9 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#101712] sm:h-10 sm:w-10"
+                aria-label="Close packing location"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mb-4 grid gap-2">
+              {(order.packingLocations || []).map((location) => {
+                const selected = String(location._id) === String(order.activePackingLocationId);
+                return (
+                  <button
+                    key={location._id}
+                    type="button"
+                    onClick={() => handleSelectPackingLocation(location._id)}
+                    disabled={savingLocation}
+                    className={`flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${selected ? "border-leaf bg-leaf/10 text-leaf" : "border-black/10 bg-white dark:border-white/10 dark:bg-[#101712]"}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <MapPin size={16} />
+                      {location.label}
+                    </span>
+                    {selected ? <CheckCircle2 size={17} /> : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            <form onSubmit={handleCreatePackingLocation} className="rounded-lg border border-black/10 p-2.5 dark:border-white/10 sm:p-3">
+              <h3 className="mb-2 text-sm font-black">Create New Location</h3>
+              <div className="grid grid-cols-[1fr_96px] gap-2">
+                <label className="grid gap-1 text-xs font-bold">
+                  Type
+                  <select
+                    value={locationDraft.type}
+                    onChange={(event) => setLocationDraft((current) => ({ ...current, type: event.target.value }))}
+                    className="min-h-11 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-leaf dark:bg-[#101712]"
+                  >
+                    <option>Tray</option>
+                    <option>Box</option>
+                    <option>Bag</option>
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs font-bold">
+                  Number
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={locationDraft.number}
+                    onChange={(event) => setLocationDraft((current) => ({ ...current, number: event.target.value }))}
+                    className="min-h-11 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-leaf dark:bg-[#101712]"
+                    placeholder="1"
+                  />
+                </label>
+              </div>
+              <button
+                type="submit"
+                disabled={savingLocation}
+                aria-busy={savingLocation ? "true" : undefined}
+                className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
+              >
+                {savingLocation ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+                {savingLocation ? "Saving..." : "Create New Location"}
+              </button>
+            </form>
+          </section>
         </div>
       )}
       {partyNameOpen && (

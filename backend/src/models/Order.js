@@ -15,10 +15,24 @@ const orderItemSchema = new mongoose.Schema(
     pricePerUnit: { type: Number, min: 0 },
     totalAmount: { type: Number, min: 0 },
     packedQuantity: { type: Number, default: 0, min: 0 },
+    packingLocations: [{
+      locationId: { type: mongoose.Schema.Types.ObjectId },
+      label: { type: String, trim: true },
+      quantity: { type: Number, default: 0, min: 0 }
+    }],
     invoiceLine: { type: String, trim: true },
     trashedAt: { type: Date, index: true }
   },
   { _id: false }
+);
+
+const packingLocationSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ["Tray", "Box", "Bag"], required: true },
+    number: { type: Number, required: true, min: 1 },
+    label: { type: String, trim: true, required: true }
+  },
+  { timestamps: true }
 );
 
 const orderSchema = new mongoose.Schema(
@@ -36,6 +50,8 @@ const orderSchema = new mongoose.Schema(
     paymentType: { type: String, trim: true },
     paidAmount: { type: Number, min: 0 },
     orderSequence: { type: Number, index: true },
+    packingLocations: [packingLocationSchema],
+    activePackingLocationId: { type: mongoose.Schema.Types.ObjectId },
     items: [orderItemSchema],
     packedStatus: {
       type: String,

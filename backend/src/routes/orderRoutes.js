@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   addOrderItem,
+  createPackingLocation,
   deleteOrder,
   deleteOrderItem,
   emptyTrash,
@@ -17,6 +18,7 @@ import {
   restoreOrder,
   restoreOrderItem,
   scanBarcode,
+  selectPackingLocation,
   updateOrderSequence,
   updateOrder,
   updateOrderItem,
@@ -46,6 +48,8 @@ router.delete("/:id/permanent", asyncHandler(permanentlyDeleteOrder));
 router.post("/:id/trash/items/:itemIndex/restore", asyncHandler(restoreOrderItem));
 router.delete("/:id/trash/items/:itemIndex/permanent", asyncHandler(permanentlyDeleteOrderItem));
 router.post("/:id/scan", asyncHandler(scanBarcode));
+router.post("/:id/packing-locations", asyncHandler(createPackingLocation));
+router.patch("/:id/packing-locations/:locationId/active", asyncHandler(selectPackingLocation));
 router.post("/:id/manual-complete", asyncHandler(manuallyCompleteOrder));
 router.post("/:id/items", asyncHandler(addOrderItem));
 router.delete("/:id/items/:itemIndex", asyncHandler(deleteOrderItem));

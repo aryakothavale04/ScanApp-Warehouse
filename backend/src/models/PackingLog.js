@@ -6,7 +6,9 @@ const packingLogSchema = new mongoose.Schema(
     productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", index: true },
     scannedAt: { type: Date, default: Date.now },
     scannedBy: { type: String, default: "packing-staff", trim: true },
-    barcode: { type: String, required: true, trim: true }
+    barcode: { type: String, required: true, trim: true },
+    packingLocationId: { type: mongoose.Schema.Types.ObjectId },
+    packingLocationLabel: { type: String, trim: true }
   },
   { timestamps: true }
 );

@@ -1,7 +1,8 @@
 "use client";
 
-import { Check, CheckCheck, Edit3, Loader2, Minus, PackageX, Plus, Save, Trash2, X } from "lucide-react";
+import { Check, CheckCheck, Edit3, Loader2, MapPin, Minus, PackageX, Plus, Save, Trash2, X } from "lucide-react";
 import { memo, useMemo, useState } from "react";
+import { formatPackingLocations } from "@/src/lib/slips";
 
 function getBarcodeLabel(item) {
   const barcode = item.productId?.barcode || item.hsnOrBarcode;
@@ -152,6 +153,10 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                       </h3>
                       <p className={`mt-0.5 text-black/55 dark:text-white/55 sm:mt-1 ${scanningMode ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"}`}>
                         HSN / Barcode: {barcodeLabel}
+                      </p>
+                      <p className={`mt-1 flex items-center gap-1 font-bold text-leaf ${scanningMode ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"}`}>
+                        <MapPin size={scanningMode ? 12 : 14} />
+                        <span className="truncate">Location: {formatPackingLocations(item)}</span>
                       </p>
                     </>
                   )}
