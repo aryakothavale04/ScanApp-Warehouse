@@ -1,9 +1,9 @@
 "use client";
 
-import { Barcode, Camera, CheckCircle2, ChevronDown, FileText, Loader2, MapPin, Plus, Save, Square, Truck, UserRound, X } from "lucide-react";
+import { Barcode, Camera, CheckCircle2, ChevronDown, Download, FileText, Loader2, MapPin, Plus, Save, Square, Truck, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/src/lib/api";
-import { openOrderSlip } from "@/src/lib/slips";
+import { downloadOrderSlipPdf } from "@/src/lib/slips";
 import BarcodeScanner from "./BarcodeScanner";
 import PackingChecklist from "./PackingChecklist";
 import ProgressRing from "./ProgressRing";
@@ -84,6 +84,7 @@ export default function PackingScreen({ orderId }) {
   const [locationOpen, setLocationOpen] = useState(false);
   const [locationDraft, setLocationDraft] = useState({ type: "Tray", number: "" });
   const [savingLocation, setSavingLocation] = useState(false);
+  const [downloadingSlip, setDownloadingSlip] = useState(null);
   const scanLoadingRef = useRef(false);
   const pendingScanQueueRef = useRef([]);
   const packingActionQueueRef = useRef(Promise.resolve());
@@ -350,6 +351,18 @@ export default function PackingScreen({ orderId }) {
     }
   }, [locationDraft, orderId, replaceOrder, showToast]);
 
+  const handleDownloadSlip = useCallback(async (slipType) => {
+    setDownloadingSlip(slipType);
+    try {
+      await downloadOrderSlipPdf(order, slipType);
+      showToast({ type: "success", message: slipType === "both" ? "Slips downloaded" : "Slip downloaded" });
+    } catch (error) {
+      showToast({ type: "error", message: error.message || "Could not download slip" });
+    } finally {
+      setDownloadingSlip(null);
+    }
+  }, [order, showToast]);
+
   if (loading) {
     return (
       <main className="grid min-h-screen place-items-center">
@@ -421,22 +434,33 @@ export default function PackingScreen({ orderId }) {
     </button>
   );
   const slipButtons = (
-    <div className="grid grid-cols-2 gap-2">
+    <div className="grid grid-cols-3 gap-2">
       <button
         type="button"
-        onClick={() => openOrderSlip(order, "packing")}
-        className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-bold shadow-sm dark:border-white/10 dark:bg-[#151f1a] sm:min-h-11 sm:text-sm"
+        onClick={() => handleDownloadSlip("packing")}
+        disabled={Boolean(downloadingSlip)}
+        className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-2 text-xs font-bold shadow-sm disabled:opacity-60 dark:border-white/10 dark:bg-[#151f1a] sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
       >
-        <FileText size={16} />
-        Packing Slip
+        {downloadingSlip === "packing" ? <Loader2 className="animate-spin" size={16} /> : <FileText size={16} />}
+        Packing
       </button>
       <button
         type="button"
-        onClick={() => openOrderSlip(order, "delivery")}
-        className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-xs font-bold shadow-sm dark:border-white/10 dark:bg-[#151f1a] sm:min-h-11 sm:text-sm"
+        onClick={() => handleDownloadSlip("delivery")}
+        disabled={Boolean(downloadingSlip)}
+        className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-2 text-xs font-bold shadow-sm disabled:opacity-60 dark:border-white/10 dark:bg-[#151f1a] sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
       >
-        <Truck size={16} />
-        Delivery Slip
+        {downloadingSlip === "delivery" ? <Loader2 className="animate-spin" size={16} /> : <Truck size={16} />}
+        Delivery
+      </button>
+      <button
+        type="button"
+        onClick={() => handleDownloadSlip("both")}
+        disabled={Boolean(downloadingSlip)}
+        className="flex min-h-10 items-center justify-center gap-1.5 rounded-lg bg-leaf px-2 py-2 text-xs font-bold text-white shadow-sm disabled:opacity-60 sm:min-h-11 sm:gap-2 sm:px-3 sm:text-sm"
+      >
+        {downloadingSlip === "both" ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+        Both
       </button>
     </div>
   );
@@ -523,7 +547,7 @@ export default function PackingScreen({ orderId }) {
 
         <div className="mb-2.5 grid gap-2 sm:mb-4 sm:grid-cols-[1fr_auto]">
           {locationButton}
-          <div className="sm:min-w-[290px]">{slipButtons}</div>
+          <div className="sm:min-w-[360px]">{slipButtons}</div>
         </div>
 
         {scannerActive ? (
