@@ -720,20 +720,20 @@ export default function PackingScreen({ orderId }) {
 
             <form onSubmit={handleCreatePackingLocation} className="rounded-lg border border-black/10 p-2.5 dark:border-white/10 sm:p-3">
               <h3 className="mb-2 text-sm font-black">Create New Location</h3>
-              <div className="grid grid-cols-[1fr_96px] gap-2">
-                <label className="grid gap-1 text-xs font-bold">
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_112px]">
+                <label className="grid min-w-0 gap-1 text-xs font-bold">
                   Type
                   <select
                     value={locationDraft.type}
                     onChange={(event) => setLocationDraft((current) => ({ ...current, type: event.target.value }))}
-                    className="min-h-11 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-leaf dark:bg-[#101712]"
+                    className="min-h-11 w-full min-w-0 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-leaf dark:bg-[#101712]"
                   >
                     <option>Tray</option>
                     <option>Box</option>
                     <option>Bag</option>
                   </select>
                 </label>
-                <label className="grid gap-1 text-xs font-bold">
+                <label className="grid min-w-0 gap-1 text-xs font-bold">
                   Number
                   <input
                     type="number"
@@ -741,7 +741,7 @@ export default function PackingScreen({ orderId }) {
                     step="1"
                     value={locationDraft.number}
                     onChange={(event) => setLocationDraft((current) => ({ ...current, number: event.target.value }))}
-                    className="min-h-11 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-leaf dark:bg-[#101712]"
+                    className="min-h-11 w-full min-w-0 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-leaf dark:bg-[#101712]"
                     placeholder="1"
                   />
                 </label>
