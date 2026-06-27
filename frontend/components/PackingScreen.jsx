@@ -1,6 +1,6 @@
 "use client";
 
-import { Barcode, Camera, CheckCircle2, ChevronDown, Loader2, MapPin, Plus, Save, Square, Truck, UserRound, X } from "lucide-react";
+import { Barcode, Camera, CheckCircle2, ChevronDown, Loader2, MapPin, Plus, Save, Square, Trash2, Truck, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/src/lib/api";
 import { downloadOrderSlipPdf } from "@/src/lib/slips";
@@ -84,6 +84,7 @@ export default function PackingScreen({ orderId }) {
   const [locationOpen, setLocationOpen] = useState(false);
   const [locationDraft, setLocationDraft] = useState({ type: "Tray", number: "" });
   const [savingLocation, setSavingLocation] = useState(false);
+  const [deletingLocationId, setDeletingLocationId] = useState(null);
   const [downloadingSlip, setDownloadingSlip] = useState(null);
   const scanLoadingRef = useRef(false);
   const pendingScanQueueRef = useRef([]);
@@ -351,6 +352,19 @@ export default function PackingScreen({ orderId }) {
     }
   }, [locationDraft, orderId, replaceOrder, showToast]);
 
+  const handleDeletePackingLocation = useCallback(async (location) => {
+    setDeletingLocationId(location._id);
+    try {
+      const data = await api.deletePackingLocation(orderId, location._id);
+      replaceOrder(data.order);
+      showToast({ type: "success", message: data.message || "Packing location deleted" });
+    } catch (error) {
+      showToast({ type: "error", message: error.message });
+    } finally {
+      setDeletingLocationId(null);
+    }
+  }, [orderId, replaceOrder, showToast]);
+
   const handleDownloadDeliverySlip = useCallback(async () => {
     setDownloadingSlip("delivery");
     try {
@@ -428,7 +442,7 @@ export default function PackingScreen({ orderId }) {
       <MapPin size={18} className="shrink-0 text-leaf" />
       <span className="min-w-0 flex-1">
         <span className="block text-[11px] font-semibold text-black/50 dark:text-white/50 sm:text-xs">Active Packing Location</span>
-        <span className="block truncate text-sm font-black sm:text-base">{activePackingLocation?.label || "Tray 1"}</span>
+        <span className="block max-w-full break-words text-sm font-black leading-snug sm:text-base">{activePackingLocation?.label || "Tray 1"}</span>
       </span>
       <ChevronDown size={17} className="shrink-0 text-black/45 dark:text-white/45" />
     </button>
@@ -460,6 +474,7 @@ export default function PackingScreen({ orderId }) {
   const checklist = (
     <PackingChecklist
       items={order.items}
+      packingLocations={order.packingLocations || []}
       lastPackedItemId={lastPackedItemId}
       onManualPack={handleManualPackItem}
       onManualPackFull={handleManualPackFullItem}
@@ -670,20 +685,35 @@ export default function PackingScreen({ orderId }) {
             <div className="mb-4 grid gap-2">
               {(order.packingLocations || []).map((location) => {
                 const selected = String(location._id) === String(order.activePackingLocationId);
+                const deleting = deletingLocationId === location._id;
                 return (
-                  <button
+                  <div
                     key={location._id}
-                    type="button"
-                    onClick={() => handleSelectPackingLocation(location._id)}
-                    disabled={savingLocation}
-                    className={`flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm font-bold ${selected ? "border-leaf bg-leaf/10 text-leaf" : "border-black/10 bg-white dark:border-white/10 dark:bg-[#101712]"}`}
+                    className={`grid grid-cols-[1fr_auto] items-stretch gap-1.5 rounded-lg border p-1.5 ${selected ? "border-leaf bg-leaf/10 text-leaf" : "border-black/10 bg-white dark:border-white/10 dark:bg-[#101712]"}`}
                   >
-                    <span className="flex items-center gap-2">
-                      <MapPin size={16} />
-                      {location.label}
-                    </span>
-                    {selected ? <CheckCircle2 size={17} /> : null}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectPackingLocation(location._id)}
+                      disabled={savingLocation || Boolean(deletingLocationId)}
+                      className="flex min-h-10 min-w-0 items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm font-bold disabled:opacity-60"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <MapPin size={16} className="shrink-0" />
+                        <span className="min-w-0 break-words leading-snug">{location.label}</span>
+                      </span>
+                      {selected ? <CheckCircle2 size={17} className="shrink-0" /> : null}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePackingLocation(location)}
+                      disabled={savingLocation || Boolean(deletingLocationId) || (order.packingLocations || []).length <= 1}
+                      className="grid h-10 w-10 place-items-center rounded-md border border-red-200 bg-white text-red-700 disabled:opacity-40 dark:border-red-900/70 dark:bg-[#151f1a] dark:text-red-300"
+                      aria-label={`Delete ${location.label}`}
+                      title="Delete location"
+                    >
+                      {deleting ? <Loader2 className="animate-spin" size={15} /> : <Trash2 size={15} />}
+                    </button>
+                  </div>
                 );
               })}
             </div>

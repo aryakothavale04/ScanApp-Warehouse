@@ -85,6 +85,7 @@ export const api = {
     request(`/api/orders/${orderId}/packing-locations/${locationId}/active`, "patch", {
       data: {}
     }),
+  deletePackingLocation: (orderId, locationId) => request(`/api/orders/${orderId}/packing-locations/${locationId}`, "delete"),
   deleteOrder: (id) => request(`/api/orders/${id}`, "delete"),
   restoreOrder: (id) => request(`/api/orders/${id}/restore`, "post", {
     data: {}

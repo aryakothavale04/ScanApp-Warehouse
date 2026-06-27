@@ -4,6 +4,7 @@ import {
   createPackingLocation,
   deleteOrder,
   deleteOrderItem,
+  deletePackingLocation,
   emptyTrash,
   getOrder,
   listOrders,
@@ -50,6 +51,7 @@ router.delete("/:id/trash/items/:itemIndex/permanent", asyncHandler(permanentlyD
 router.post("/:id/scan", asyncHandler(scanBarcode));
 router.post("/:id/packing-locations", asyncHandler(createPackingLocation));
 router.patch("/:id/packing-locations/:locationId/active", asyncHandler(selectPackingLocation));
+router.delete("/:id/packing-locations/:locationId", asyncHandler(deletePackingLocation));
 router.post("/:id/manual-complete", asyncHandler(manuallyCompleteOrder));
 router.post("/:id/items", asyncHandler(addOrderItem));
 router.delete("/:id/items/:itemIndex", asyncHandler(deleteOrderItem));

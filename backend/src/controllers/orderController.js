@@ -192,6 +192,15 @@ function clearPackedLocations(item) {
   item.packingLocations = [];
 }
 
+function replacePackedLocation(item, location) {
+  if (!location || (item.packedQuantity || 0) <= 0) return;
+  item.packingLocations = [{
+    locationId: location._id,
+    label: location.label,
+    quantity: item.packedQuantity || 0
+  }];
+}
+
 function findOrderItemByScan(order, scannedValue) {
   const scannedBarcode = normalizeBarcode(scannedValue);
   const scannedText = normalizeScanText(scannedValue);
@@ -535,6 +544,39 @@ export async function selectPackingLocation(req, res) {
   res.json({ message: `${location.label} selected`, order: serializeOrder(order) });
 }
 
+export async function deletePackingLocation(req, res) {
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  ensureDefaultPackingLocation(order);
+  const location = order.packingLocations.id?.(req.params.locationId) || order.packingLocations.find((entry) => entry._id?.toString() === req.params.locationId);
+  if (!location) {
+    return res.status(404).json({ message: "Packing location not found" });
+  }
+
+  const isLocationInUse = getActiveItems(order.items || []).some((item) => (
+    (item.packingLocations || []).some((entry) => entry.locationId?.toString() === location._id?.toString() && (entry.quantity || 0) > 0)
+  ));
+  if (isLocationInUse) {
+    return res.status(409).json({ message: `Move packed items out of ${location.label} before deleting it` });
+  }
+
+  if (order.packingLocations.length <= 1) {
+    return res.status(409).json({ message: "At least one packing location is required" });
+  }
+
+  const label = location.label;
+  order.packingLocations.pull(location._id);
+  if (order.activePackingLocationId?.toString() === location._id?.toString()) {
+    order.activePackingLocationId = order.packingLocations[0]?._id;
+  }
+  await order.save();
+
+  res.json({ message: `${label} deleted`, order: serializeOrder(order) });
+}
+
 export async function addOrderItem(req, res) {
   const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {
@@ -579,7 +621,7 @@ export async function updateOrderItem(req, res) {
     return res.status(404).json({ message: "Order item not found" });
   }
 
-  const { productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount } = req.body;
+  const { productName, hsnOrBarcode, quantity, pricePerUnit, totalAmount, packingLocationId } = req.body;
   const nextQuantity = Number(quantity);
   if (!productName?.trim()) {
     return res.status(400).json({ message: "Product name is required" });
@@ -597,6 +639,14 @@ export async function updateOrderItem(req, res) {
   item.packedQuantity = Math.min(item.packedQuantity, item.quantity);
   if (item.packedQuantity < previousPackedQuantity) {
     removePackedLocationQuantity(item, previousPackedQuantity - item.packedQuantity);
+  }
+  if (packingLocationId && item.packedQuantity > 0) {
+    ensureDefaultPackingLocation(order);
+    const location = order.packingLocations.id?.(packingLocationId) || order.packingLocations.find((entry) => entry._id?.toString() === packingLocationId?.toString());
+    if (!location) {
+      return res.status(404).json({ message: "Packing location not found" });
+    }
+    replacePackedLocation(item, location);
   }
 
   order.recalculateStatus();

@@ -18,11 +18,12 @@ function createDraft(item) {
     hsnOrBarcode: barcodeLabel === "Missing" ? "" : item.productId?.barcode || item.hsnOrBarcode || "",
     quantity: item.quantity ?? 1,
     pricePerUnit: item.pricePerUnit ?? 0,
-    totalAmount: item.totalAmount ?? 0
+    totalAmount: item.totalAmount ?? 0,
+    packingLocationId: item.packingLocations?.[0]?.locationId ? String(item.packingLocations[0].locationId) : ""
   };
 }
 
-function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManualPackFull, onRemoveOnePacked, onRemovePacked, onUpdateItem, onDeleteItem, onError, scanningMode = false }) {
+function PackingChecklist({ items = [], packingLocations = [], lastPackedItemId, onManualPack, onManualPackFull, onRemoveOnePacked, onRemovePacked, onUpdateItem, onDeleteItem, onError, scanningMode = false }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
@@ -142,6 +143,20 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                         placeholder="Barcode or Missing"
                         aria-label="HSN or barcode"
                       />
+                      <label className="grid gap-1 text-xs font-bold text-black/60 dark:text-white/60">
+                        Packing location
+                        <select
+                          value={draft.packingLocationId}
+                          onChange={(event) => updateDraft("packingLocationId", event.target.value)}
+                          disabled={(item.packedQuantity || 0) <= 0}
+                          className="min-h-10 w-full rounded-lg border border-black/10 bg-white px-2.5 py-2 text-sm font-bold text-black outline-none focus:border-leaf disabled:opacity-50 dark:bg-[#101712] dark:text-white sm:px-3"
+                        >
+                          <option value="">No packed location</option>
+                          {packingLocations.map((location) => (
+                            <option key={location._id} value={String(location._id)}>{location.label}</option>
+                          ))}
+                        </select>
+                      </label>
                     </div>
                   ) : (
                     <>
@@ -154,9 +169,9 @@ function PackingChecklist({ items = [], lastPackedItemId, onManualPack, onManual
                       <p className={`mt-0.5 text-black/55 dark:text-white/55 sm:mt-1 ${scanningMode ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"}`}>
                         HSN / Barcode: {barcodeLabel}
                       </p>
-                      <p className={`mt-1 flex items-center gap-1 font-bold text-leaf ${scanningMode ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"}`}>
-                        <MapPin size={scanningMode ? 12 : 14} />
-                        <span className="truncate">Location: {formatPackingLocations(item)}</span>
+                      <p className={`mt-1 flex min-w-0 items-start gap-1 font-bold text-leaf ${scanningMode ? "text-[11px] sm:text-xs" : "text-xs sm:text-sm"}`}>
+                        <MapPin size={scanningMode ? 12 : 14} className="mt-0.5 shrink-0" />
+                        <span className="min-w-0 max-w-full break-words leading-snug">Location: {formatPackingLocations(item)}</span>
                       </p>
                     </>
                   )}
