@@ -11,6 +11,7 @@ import {
   listTrashedOrders,
   manuallyCompleteOrder,
   manuallyPackFullOrderItem,
+  manuallyPackLooseOrderItem,
   manuallyPackOrderItem,
   permanentlyDeleteOrder,
   permanentlyDeleteOrderItem,
@@ -57,6 +58,7 @@ router.post("/:id/items", asyncHandler(addOrderItem));
 router.delete("/:id/items/:itemIndex", asyncHandler(deleteOrderItem));
 router.patch("/:id/items/:itemIndex", asyncHandler(updateOrderItem));
 router.post("/:id/items/:itemIndex/manual-pack", asyncHandler(manuallyPackOrderItem));
+router.post("/:id/items/:itemIndex/manual-pack-loose", asyncHandler(manuallyPackLooseOrderItem));
 router.post("/:id/items/:itemIndex/manual-pack-full", asyncHandler(manuallyPackFullOrderItem));
 router.post("/:id/items/:itemIndex/remove-pack-one", asyncHandler(removeOnePackedOrderItem));
 router.post("/:id/items/:itemIndex/remove-pack", asyncHandler(removePackedOrderItem));

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCheck, Edit3, Loader2, MapPin, Minus, PackageX, Plus, Save, Trash2, X } from "lucide-react";
+import { Check, CheckCheck, Edit3, Loader2, MapPin, Minus, PackageOpen, PackageX, Plus, Save, Trash2, X } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { formatPackingLocations } from "@/src/lib/slips";
 
@@ -23,7 +23,7 @@ function createDraft(item) {
   };
 }
 
-function PackingChecklist({ items = [], packingLocations = [], lastPackedItemId, onManualPack, onManualPackFull, onRemoveOnePacked, onRemovePacked, onUpdateItem, onDeleteItem, onError, scanningMode = false }) {
+function PackingChecklist({ items = [], packingLocations = [], lastPackedItemId, onManualPack, onManualPackLoose, onManualPackFull, onRemoveOnePacked, onRemovePacked, onUpdateItem, onDeleteItem, onError, scanningMode = false }) {
   const [editingIndex, setEditingIndex] = useState(null);
   const [draft, setDraft] = useState(null);
   const [busyAction, setBusyAction] = useState(null);
@@ -68,6 +68,10 @@ function PackingChecklist({ items = [], packingLocations = [], lastPackedItemId,
 
   async function manualPack(index) {
     onManualPack(index).catch((error) => onError?.(error.message));
+  }
+
+  async function manualPackLoose(index) {
+    onManualPackLoose(index).catch((error) => onError?.(error.message));
   }
 
   async function manualPackFull(index) {
@@ -316,6 +320,18 @@ function PackingChecklist({ items = [], packingLocations = [], lastPackedItemId,
                       >
                         <Plus size={actionIconSize} />
                       </button>
+                      {onManualPackLoose && (
+                        <button
+                          type="button"
+                          onClick={() => manualPackLoose(index)}
+                          disabled={!canManualPack}
+                          className={`grid ${actionButtonSize} place-items-center rounded-lg border border-amber-300 bg-amber-50 text-amber-800 shadow-sm transition active:scale-95 disabled:opacity-35 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200 ${scanningMode ? "rounded-full" : ""}`}
+                          aria-label={`Add one loose item quantity for ${item.productName || "product"}`}
+                          title="Add 1 to Loose Items"
+                        >
+                          <PackageOpen size={actionIconSize} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

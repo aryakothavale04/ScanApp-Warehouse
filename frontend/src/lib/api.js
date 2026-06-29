@@ -126,6 +126,10 @@ export const api = {
     request(`/api/orders/${orderId}/items/${itemIndex}/manual-pack`, "post", {
       data: { scannedBy }
     }),
+  manualPackLooseOrderItem: (orderId, itemIndex, scannedBy = "packing-staff") =>
+    request(`/api/orders/${orderId}/items/${itemIndex}/manual-pack-loose`, "post", {
+      data: { scannedBy }
+    }),
   manualPackFullOrderItem: (orderId, itemIndex, scannedBy = "packing-staff") =>
     request(`/api/orders/${orderId}/items/${itemIndex}/manual-pack-full`, "post", {
       data: { scannedBy }

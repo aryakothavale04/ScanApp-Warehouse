@@ -267,6 +267,18 @@ export default function PackingScreen({ orderId }) {
     });
   }, [enqueuePackingAction, orderId, replaceOrder, showToast]);
 
+  const handleManualPackLooseItem = useCallback(async (itemIndex) => {
+    return enqueuePackingAction(async () => {
+      const data = await api.manualPackLooseOrderItem(orderId, itemIndex);
+      replaceOrder(data.order);
+      setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
+      showToast({ type: "success", message: data.message || "Added to Loose Items" });
+      playScanSound("correct");
+      window.navigator.vibrate?.(70);
+      setTimeout(() => setLastPackedItemId(null), 900);
+    });
+  }, [enqueuePackingAction, orderId, replaceOrder, showToast]);
+
   const handleManualPackFullItem = useCallback(async (itemIndex) => {
     return enqueuePackingAction(async () => {
       const data = await api.manualPackFullOrderItem(orderId, itemIndex);
@@ -503,6 +515,7 @@ export default function PackingScreen({ orderId }) {
       packingLocations={order.packingLocations || []}
       lastPackedItemId={lastPackedItemId}
       onManualPack={handleManualPackItem}
+      onManualPackLoose={handleManualPackLooseItem}
       onManualPackFull={handleManualPackFullItem}
       onRemoveOnePacked={handleRemoveOnePackedItem}
       onRemovePacked={handleRemovePackedItem}

@@ -172,6 +172,18 @@ function getActivePackingLocation(order) {
   return ensureDefaultPackingLocation(order);
 }
 
+function getOrCreateLooseItemsLocation(order) {
+  ensureDefaultPackingLocation(order);
+  const existing = order.packingLocations.find((location) => location.type === "Loose Items");
+  if (existing) return existing;
+
+  order.packingLocations.push({
+    type: "Loose Items",
+    label: "Loose Items"
+  });
+  return order.packingLocations[order.packingLocations.length - 1];
+}
+
 function addPackedLocationQuantity(item, location, quantity = 1) {
   if (!location || quantity <= 0) return;
 
@@ -736,6 +748,46 @@ export async function manuallyPackOrderItem(req, res) {
   const itemCompleted = item.packedQuantity >= item.quantity;
   res.json({
     message: order.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed" : `${item.productName} manually packed`,
+    packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
+    order: serializeOrder(order)
+  });
+}
+
+export async function manuallyPackLooseOrderItem(req, res) {
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  const item = getOrderItemByIndex(order, req.params.itemIndex);
+  if (!item) {
+    return res.status(404).json({ message: "Order item not found" });
+  }
+
+  if (item.packedQuantity >= item.quantity) {
+    return res.status(409).json({ message: `Qty completed: ${item.productName} is already fully packed` });
+  }
+
+  const looseLocation = getOrCreateLooseItemsLocation(order);
+  const packedNow = Math.min(1, item.quantity - item.packedQuantity);
+  item.packedQuantity += packedNow;
+  addPackedLocationQuantity(item, looseLocation, packedNow);
+  order.recalculateStatus();
+  await order.save();
+
+  await PackingLog.create({
+    orderId: order._id,
+    productId: getProductId(item.productId),
+    scannedAt: new Date(),
+    scannedBy: req.body.scannedBy || "packing-staff",
+    barcode: "manual-loose-item",
+    packingLocationId: looseLocation._id,
+    packingLocationLabel: looseLocation.label
+  });
+
+  const itemCompleted = item.packedQuantity >= item.quantity;
+  res.json({
+    message: order.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed in Loose Items" : `${item.productName} added to Loose Items`,
     packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
     order: serializeOrder(order)
   });
