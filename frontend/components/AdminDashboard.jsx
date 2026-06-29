@@ -1,9 +1,10 @@
 "use client";
 
-import { Boxes, CheckCircle2, ListOrdered, Loader2, TimerReset, Trash2 } from "lucide-react";
+import { Boxes, CheckCircle2, Download, Eye, ListOrdered, Loader2, Printer, Share2, TimerReset, Trash2, Truck, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { api, clearStoredAccessCode } from "@/src/lib/api";
+import { downloadDeliveryChallanPdf, getDeliveryChallanSummary, openDeliveryChallanPrint, shareDeliveryChallanPdf } from "@/src/lib/slips";
 import OrderCard from "./OrderCard";
 import StoreBrand from "./StoreBrand";
 import Toast from "./Toast";
@@ -27,6 +28,8 @@ export default function AdminDashboard() {
   const [sequenceDraft, setSequenceDraft] = useState("");
   const [sequenceSaving, setSequenceSaving] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [challanPreviewOpen, setChallanPreviewOpen] = useState(false);
+  const [challanAction, setChallanAction] = useState(null);
   const [toast, setToast] = useState(null);
   const [toastHistory, setToastHistory] = useState([]);
 
@@ -66,6 +69,42 @@ export default function AdminDashboard() {
     } catch (error) {
       showToast({ type: "error", message: error.message });
       throw error;
+    }
+  }
+
+  async function shareOrderChallan(order) {
+    setChallanAction(order._id);
+    try {
+      const shared = await shareDeliveryChallanPdf(order);
+      showToast({ type: "success", message: shared ? "Delivery challan shared" : "Sharing is unavailable; PDF downloaded" });
+    } catch (error) {
+      showToast({ type: "error", message: error.message || "Could not share delivery challan" });
+    } finally {
+      setChallanAction(null);
+    }
+  }
+
+  async function shareAllChallans() {
+    setChallanAction("share-all");
+    try {
+      const shared = await shareDeliveryChallanPdf(stats.orderedOrders);
+      showToast({ type: "success", message: shared ? "Delivery challans shared" : "Sharing is unavailable; PDF downloaded" });
+    } catch (error) {
+      showToast({ type: "error", message: error.message || "Could not share delivery challans" });
+    } finally {
+      setChallanAction(null);
+    }
+  }
+
+  async function downloadAllChallans() {
+    setChallanAction("download-all");
+    try {
+      await downloadDeliveryChallanPdf(stats.orderedOrders);
+      showToast({ type: "success", message: "Delivery challans downloaded" });
+    } catch (error) {
+      showToast({ type: "error", message: error.message || "Could not download delivery challans" });
+    } finally {
+      setChallanAction(null);
     }
   }
 
@@ -256,6 +295,15 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => setChallanPreviewOpen(true)}
+                  disabled={!stats.orderedOrders.length}
+                  className="flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50 dark:border-white/10 dark:bg-transparent sm:min-h-10 sm:text-sm"
+                >
+                  <Truck size={15} />
+                  Challans
+                </button>
+                <button
+                  type="button"
                   onClick={() => setSequenceMode((current) => !current)}
                   className={`flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold sm:min-h-10 sm:text-sm ${sequenceMode ? "border-leaf bg-leaf text-white" : "border-black/10 bg-white dark:border-white/10 dark:bg-transparent"}`}
                 >
@@ -295,6 +343,8 @@ export default function AdminDashboard() {
                     canMoveUp={index > 0}
                     canMoveDown={index < stats.orderedOrders.length - 1}
                     moving={Boolean(movingOrderId)}
+                    onShareChallan={shareOrderChallan}
+                    challanLoading={challanAction === order._id}
                   />
                 ))}
                 {!stats.orderedOrders.length && (
@@ -342,6 +392,101 @@ export default function AdminDashboard() {
                 className="min-h-11 rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white"
               >
                 Log Out
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {challanPreviewOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-2.5 sm:place-items-center sm:p-3">
+          <section className="max-h-[92vh] w-full max-w-3xl overflow-auto rounded-lg bg-white p-3 shadow-soft dark:bg-[#151f1a] sm:p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-black sm:text-lg">Delivery Challans</h2>
+                <p className="text-xs text-black/55 dark:text-white/55">All current dashboard orders.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChallanPreviewOpen(false)}
+                className="grid h-9 w-9 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#101712] sm:h-10 sm:w-10"
+                aria-label="Close delivery challans"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid gap-2">
+              {stats.orderedOrders.map((order) => {
+                const summary = getDeliveryChallanSummary(order);
+                return (
+                  <article key={order._id} className="rounded-lg border border-black/10 p-3 dark:border-white/10">
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-black">{summary.orderNumber}</h3>
+                        <p className="truncate text-xs text-black/55 dark:text-white/55">{summary.customerName}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openDeliveryChallanPrint(order)}
+                        className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-black/10 dark:border-white/10"
+                        aria-label={`Print delivery challan for ${summary.orderNumber}`}
+                        title="Print"
+                      >
+                        <Printer size={15} />
+                      </button>
+                    </div>
+                    <div className="grid gap-2 text-xs sm:grid-cols-2">
+                      <p><span className="font-bold text-black/55 dark:text-white/55">Contact:</span> {summary.contact}</p>
+                      <p><span className="font-bold text-black/55 dark:text-white/55">Date:</span> {summary.date}</p>
+                      <p className="sm:col-span-2"><span className="font-bold text-black/55 dark:text-white/55">Address:</span> {summary.deliveryAddress}</p>
+                    </div>
+                    <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+                      <div className="rounded-lg bg-limewash p-2 dark:bg-white/5">
+                        <p className="mb-1 font-black">Delivery Containers</p>
+                        {(summary.containers.length ? summary.containers : [{ label: "No delivery containers assigned.", quantity: "-" }]).map((container) => (
+                          <p key={container.label} className="flex justify-between gap-2"><span>{container.label}</span><span>{container.quantity}</span></p>
+                        ))}
+                      </div>
+                      <div className="rounded-lg bg-limewash p-2 dark:bg-white/5">
+                        <p className="mb-1 font-black">Loose Items</p>
+                        {(summary.looseItems.length ? summary.looseItems : [{ label: "No loose items assigned.", quantity: "-" }]).map((item) => (
+                          <p key={item.label} className="flex justify-between gap-2"><span>{item.label}</span><span>{item.quantity}</span></p>
+                        ))}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+
+            <div className="sticky bottom-0 -mx-3 mt-4 grid grid-cols-3 gap-2 border-t border-black/10 bg-white p-3 dark:border-white/10 dark:bg-[#151f1a] sm:-mx-4 sm:px-4">
+              <button
+                type="button"
+                onClick={shareAllChallans}
+                disabled={Boolean(challanAction)}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-black/10 px-3 py-2 text-sm font-bold disabled:opacity-60 dark:border-white/10"
+              >
+                {challanAction === "share-all" ? <Loader2 className="animate-spin" size={16} /> : <Share2 size={16} />}
+                Share
+              </button>
+              <button
+                type="button"
+                onClick={downloadAllChallans}
+                disabled={Boolean(challanAction)}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-black/10 px-3 py-2 text-sm font-bold disabled:opacity-60 dark:border-white/10"
+              >
+                {challanAction === "download-all" ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                PDF
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  stats.orderedOrders.forEach((order) => openDeliveryChallanPrint(order));
+                }}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white"
+              >
+                <Eye size={16} />
+                View
               </button>
             </div>
           </section>

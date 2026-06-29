@@ -28,8 +28,8 @@ const orderItemSchema = new mongoose.Schema(
 
 const packingLocationSchema = new mongoose.Schema(
   {
-    type: { type: String, enum: ["Tray", "Box", "Bag"], required: true },
-    number: { type: Number, required: true, min: 1 },
+    type: { type: String, enum: ["Tray", "Box", "Bag", "Loose Items"], required: true },
+    number: { type: Number, min: 1 },
     label: { type: String, trim: true, required: true }
   },
   { timestamps: true }

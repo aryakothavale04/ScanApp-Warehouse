@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, ClipboardList, Loader2, MoveDown, MoveUp, PackageCheck, Trash2 } from "lucide-react";
+import { CheckCircle2, ClipboardList, Loader2, MoveDown, MoveUp, PackageCheck, Share2, Trash2 } from "lucide-react";
 import { memo, useState } from "react";
 import ProgressRing from "./ProgressRing";
 
-function OrderCard({ order, onDelete, compact = false, sequenceNumber, onSequenceClick, sequenceControls = false, onMoveUp, onMoveDown, canMoveUp = false, canMoveDown = false, moving = false }) {
+function OrderCard({ order, onDelete, compact = false, sequenceNumber, onSequenceClick, sequenceControls = false, onMoveUp, onMoveDown, canMoveUp = false, canMoveDown = false, moving = false, onShareChallan, challanLoading = false }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const totals = order.progress || {
@@ -104,6 +104,20 @@ function OrderCard({ order, onDelete, compact = false, sequenceNumber, onSequenc
         </Link>
 
         <div className={compact ? "grid shrink-0 gap-1" : "mt-4 grid gap-2"}>
+          {onShareChallan && (
+            <button
+              type="button"
+              onClick={() => onShareChallan(order)}
+              disabled={challanLoading || moving}
+              aria-busy={challanLoading ? "true" : undefined}
+              className={`${compact ? "grid h-9 w-9 place-items-center rounded-lg border border-leaf/30 text-leaf transition hover:bg-leaf/5 disabled:opacity-60" : "flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-leaf/30 px-3 py-2 text-sm font-semibold text-leaf transition hover:bg-leaf/5 disabled:opacity-60"}`}
+              aria-label={`Share delivery challan for invoice ${order.invoiceNo}`}
+              title="Share delivery challan"
+            >
+              {challanLoading ? <Loader2 className="animate-spin" size={16} /> : <Share2 size={16} />}
+              {!compact && "Share Challan"}
+            </button>
+          )}
           {sequenceControls && (
             <div className={compact ? "grid gap-1" : "grid grid-cols-2 gap-2"}>
               <button

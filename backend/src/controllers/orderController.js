@@ -133,7 +133,25 @@ function getProductId(value) {
 }
 
 function buildPackingLocationLabel(type, number) {
+  if (type === "Loose Items") return "Loose Items";
   return `${type} ${number}`;
+}
+
+function isContainerLocation(type) {
+  return ["Tray", "Box", "Bag"].includes(type);
+}
+
+async function findActiveLocationConflict({ orderId, type, number }) {
+  if (!isContainerLocation(type)) return null;
+
+  return Order.findOne({
+    _id: { $ne: orderId },
+    trashedAt: { $exists: false },
+    packedStatus: { $nin: ["Completed", "Packed"] },
+    packingLocations: {
+      $elemMatch: { type, number }
+    }
+  }).select("_id invoiceNo customerName").lean();
 }
 
 function ensureDefaultPackingLocation(order) {
@@ -499,21 +517,28 @@ export async function createPackingLocation(req, res) {
   }
 
   const type = req.body?.type?.toString().trim();
-  const number = Number.parseInt(req.body?.number, 10);
-  if (!["Tray", "Box", "Bag"].includes(type)) {
-    return res.status(400).json({ message: "Location type must be Tray, Box, or Bag" });
+  const number = type === "Loose Items" ? undefined : Number.parseInt(req.body?.number, 10);
+  if (!["Tray", "Box", "Bag", "Loose Items"].includes(type)) {
+    return res.status(400).json({ message: "Location type must be Tray, Box, Bag, or Loose Items" });
   }
-  if (!Number.isInteger(number) || number <= 0) {
+  if (isContainerLocation(type) && (!Number.isInteger(number) || number <= 0)) {
     return res.status(400).json({ message: "Location number must be greater than 0" });
   }
 
   ensureDefaultPackingLocation(order);
   const label = buildPackingLocationLabel(type, number);
-  const existing = order.packingLocations.find((location) => location.type === type && location.number === number);
+  const existing = order.packingLocations.find((location) => (
+    location.type === type && (type === "Loose Items" || location.number === number)
+  ));
   if (existing) {
     order.activePackingLocationId = existing._id;
     await order.save();
     return res.json({ message: `${existing.label} selected`, order: serializeOrder(order) });
+  }
+
+  const conflict = await findActiveLocationConflict({ orderId: order._id, type, number });
+  if (conflict) {
+    return res.status(409).json({ message: `${label} is already in use. Please choose another ${type.toLowerCase()} number.` });
   }
 
   order.packingLocations.push({ type, number, label });

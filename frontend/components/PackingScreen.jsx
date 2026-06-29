@@ -1,9 +1,9 @@
 "use client";
 
-import { Barcode, Camera, CheckCircle2, ChevronDown, Loader2, MapPin, Plus, Save, Square, Trash2, Truck, UserRound, X } from "lucide-react";
+import { Barcode, Camera, CheckCircle2, ChevronDown, Download, Loader2, MapPin, Plus, Printer, Save, Share2, Square, Trash2, Truck, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/src/lib/api";
-import { downloadOrderSlipPdf } from "@/src/lib/slips";
+import { downloadDeliveryChallanPdf, getDeliveryChallanSummary, openDeliveryChallanPrint, shareDeliveryChallanPdf } from "@/src/lib/slips";
 import BarcodeScanner from "./BarcodeScanner";
 import PackingChecklist from "./PackingChecklist";
 import ProgressRing from "./ProgressRing";
@@ -85,7 +85,9 @@ export default function PackingScreen({ orderId }) {
   const [locationDraft, setLocationDraft] = useState({ type: "Tray", number: "" });
   const [savingLocation, setSavingLocation] = useState(false);
   const [deletingLocationId, setDeletingLocationId] = useState(null);
-  const [downloadingSlip, setDownloadingSlip] = useState(null);
+  const [challanPreviewOpen, setChallanPreviewOpen] = useState(false);
+  const [challanAction, setChallanAction] = useState(null);
+  const [locationPrompted, setLocationPrompted] = useState(false);
   const scanLoadingRef = useRef(false);
   const pendingScanQueueRef = useRef([]);
   const packingActionQueueRef = useRef(Promise.resolve());
@@ -133,6 +135,13 @@ export default function PackingScreen({ orderId }) {
   useEffect(() => {
     loadOrder();
   }, [loadOrder]);
+
+  useEffect(() => {
+    if (!loading && order && !locationPrompted) {
+      setLocationOpen(true);
+      setLocationPrompted(true);
+    }
+  }, [loading, locationPrompted, order]);
 
   const progress = useMemo(() => {
     if (!order) return { packedQuantity: 0, totalQuantity: 0 };
@@ -365,17 +374,35 @@ export default function PackingScreen({ orderId }) {
     }
   }, [orderId, replaceOrder, showToast]);
 
-  const handleDownloadDeliverySlip = useCallback(async () => {
-    setDownloadingSlip("delivery");
+  const challanSummary = useMemo(() => order ? getDeliveryChallanSummary(order) : null, [order]);
+
+  const handleDownloadDeliveryChallan = useCallback(async () => {
+    setChallanAction("download");
     try {
-      await downloadOrderSlipPdf(order, "delivery");
-      showToast({ type: "success", message: "Delivery slip downloaded" });
+      await downloadDeliveryChallanPdf(order);
+      showToast({ type: "success", message: "Delivery challan downloaded" });
     } catch (error) {
-      showToast({ type: "error", message: error.message || "Could not download delivery slip" });
+      showToast({ type: "error", message: error.message || "Could not download delivery challan" });
     } finally {
-      setDownloadingSlip(null);
+      setChallanAction(null);
     }
   }, [order, showToast]);
+
+  const handleShareDeliveryChallan = useCallback(async () => {
+    setChallanAction("share");
+    try {
+      const shared = await shareDeliveryChallanPdf(order);
+      showToast({ type: "success", message: shared ? "Delivery challan shared" : "Sharing is unavailable; PDF downloaded" });
+    } catch (error) {
+      showToast({ type: "error", message: error.message || "Could not share delivery challan" });
+    } finally {
+      setChallanAction(null);
+    }
+  }, [order, showToast]);
+
+  const handlePrintDeliveryChallan = useCallback(() => {
+    openDeliveryChallanPrint(order);
+  }, [order]);
 
   if (loading) {
     return (
@@ -451,12 +478,11 @@ export default function PackingScreen({ orderId }) {
     <div>
       <button
         type="button"
-        onClick={handleDownloadDeliverySlip}
-        disabled={Boolean(downloadingSlip)}
+        onClick={() => setChallanPreviewOpen(true)}
         className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white shadow-sm disabled:opacity-60 sm:px-4"
       >
-        {downloadingSlip === "delivery" ? <Loader2 className="animate-spin" size={16} /> : <Truck size={16} />}
-        Delivery Slip
+        <Truck size={16} />
+        Delivery Challan
       </button>
     </div>
   );
@@ -669,7 +695,7 @@ export default function PackingScreen({ orderId }) {
           <section className="w-full max-w-md rounded-lg bg-white p-3 shadow-soft dark:bg-[#151f1a] sm:p-4">
             <div className="mb-3 flex items-center justify-between gap-3 sm:mb-4">
               <div>
-                <h2 className="text-base font-black sm:text-lg">Packing Location</h2>
+              <h2 className="text-base font-black sm:text-lg">Packing / Delivery Location</h2>
                 <p className="text-xs text-black/55 dark:text-white/55">Scanned items go to the active location.</p>
               </div>
               <button
@@ -731,20 +757,23 @@ export default function PackingScreen({ orderId }) {
                     <option>Tray</option>
                     <option>Box</option>
                     <option>Bag</option>
+                    <option>Loose Items</option>
                   </select>
                 </label>
-                <label className="grid min-w-0 gap-1 text-xs font-bold">
-                  Number
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={locationDraft.number}
-                    onChange={(event) => setLocationDraft((current) => ({ ...current, number: event.target.value }))}
-                    className="min-h-11 w-full min-w-0 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-leaf dark:bg-[#101712]"
-                    placeholder="1"
-                  />
-                </label>
+                {locationDraft.type !== "Loose Items" && (
+                  <label className="grid min-w-0 gap-1 text-xs font-bold">
+                    Number
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={locationDraft.number}
+                      onChange={(event) => setLocationDraft((current) => ({ ...current, number: event.target.value }))}
+                      className="min-h-11 w-full min-w-0 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-leaf dark:bg-[#101712]"
+                      placeholder="1"
+                    />
+                  </label>
+                )}
               </div>
               <button
                 type="submit"
@@ -756,6 +785,85 @@ export default function PackingScreen({ orderId }) {
                 {savingLocation ? "Saving..." : "Create New Location"}
               </button>
             </form>
+          </section>
+        </div>
+      )}
+      {challanPreviewOpen && challanSummary && (
+        <div className="fixed inset-0 z-50 grid place-items-end bg-black/45 p-2.5 sm:place-items-center sm:p-3">
+          <section className="max-h-[92vh] w-full max-w-2xl overflow-auto rounded-lg bg-white p-3 shadow-soft dark:bg-[#151f1a] sm:p-4">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-black sm:text-lg">Delivery Challan</h2>
+                <p className="text-xs text-black/55 dark:text-white/55">Preview before sharing, downloading, or printing.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChallanPreviewOpen(false)}
+                className="grid h-9 w-9 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#101712] sm:h-10 sm:w-10"
+                aria-label="Close delivery challan preview"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="rounded-lg border border-black/10 p-3 dark:border-white/10 sm:p-4">
+              <div className="grid gap-2 text-sm sm:grid-cols-2">
+                <p><span className="font-bold text-black/55 dark:text-white/55">Customer Name:</span> {challanSummary.customerName}</p>
+                <p><span className="font-bold text-black/55 dark:text-white/55">Order Number:</span> {challanSummary.orderNumber}</p>
+                <p><span className="font-bold text-black/55 dark:text-white/55">Contact Number:</span> {challanSummary.contact}</p>
+                <p><span className="font-bold text-black/55 dark:text-white/55">Date:</span> {challanSummary.date}</p>
+                <p className="sm:col-span-2"><span className="font-bold text-black/55 dark:text-white/55">Delivery Address:</span> {challanSummary.deliveryAddress}</p>
+              </div>
+
+              <h3 className="mt-4 text-sm font-black">Delivery Containers</h3>
+              <div className="mt-2 overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
+                {(challanSummary.containers.length ? challanSummary.containers : [{ label: "No delivery containers assigned.", quantity: "-" }]).map((container) => (
+                  <div key={container.label} className="grid grid-cols-[1fr_auto] gap-3 border-b border-black/10 px-3 py-2 text-sm last:border-b-0 dark:border-white/10">
+                    <span className="font-semibold">{container.label}</span>
+                    <span>{container.quantity}</span>
+                  </div>
+                ))}
+              </div>
+
+              <h3 className="mt-4 text-sm font-black">Loose Items</h3>
+              <div className="mt-2 overflow-hidden rounded-lg border border-black/10 dark:border-white/10">
+                {(challanSummary.looseItems.length ? challanSummary.looseItems : [{ label: "No loose items assigned.", quantity: "-" }]).map((item) => (
+                  <div key={item.label} className="grid grid-cols-[1fr_auto] gap-3 border-b border-black/10 px-3 py-2 text-sm last:border-b-0 dark:border-white/10">
+                    <span className="font-semibold">{item.label}</span>
+                    <span>{item.quantity}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={handleShareDeliveryChallan}
+                disabled={Boolean(challanAction)}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-black/10 px-3 py-2 text-sm font-bold disabled:opacity-60 dark:border-white/10"
+              >
+                {challanAction === "share" ? <Loader2 className="animate-spin" size={16} /> : <Share2 size={16} />}
+                Share
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadDeliveryChallan}
+                disabled={Boolean(challanAction)}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-black/10 px-3 py-2 text-sm font-bold disabled:opacity-60 dark:border-white/10"
+              >
+                {challanAction === "download" ? <Loader2 className="animate-spin" size={16} /> : <Download size={16} />}
+                PDF
+              </button>
+              <button
+                type="button"
+                onClick={handlePrintDeliveryChallan}
+                className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white"
+              >
+                <Printer size={16} />
+                Print
+              </button>
+            </div>
           </section>
         </div>
       )}
