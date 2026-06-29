@@ -17,7 +17,7 @@ export function formatPackingLocations(item = {}) {
 export function getDeliveryChallanSummary(order = {}) {
   const locationById = new Map((order.packingLocations || []).map((location) => [String(location._id), location]));
   const containers = new Map();
-  let looseQuantity = 0;
+  const looseItems = new Map();
 
   (order.items || []).forEach((item) => {
     (item.packingLocations || []).forEach((entry) => {
@@ -27,7 +27,11 @@ export function getDeliveryChallanSummary(order = {}) {
       const location = locationById.get(String(entry.locationId));
       const label = entry.label || location?.label || "Location";
       if (location?.type === "Loose Items" || label.toLowerCase() === "loose items") {
-        looseQuantity += quantity;
+        const itemLabel = item.itemName || item.productName || item.nativeName || "Product";
+        looseItems.set(itemLabel, {
+          label: itemLabel,
+          quantity: (looseItems.get(itemLabel)?.quantity || 0) + quantity
+        });
         return;
       }
 
@@ -45,7 +49,7 @@ export function getDeliveryChallanSummary(order = {}) {
     orderNumber: order.invoiceNo || order.orderNumber || "-",
     date: order.date || "-",
     containers: [...containers.values()].sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true })),
-    looseItems: looseQuantity > 0 ? [{ label: "Loose Items", quantity: looseQuantity }] : []
+    looseItems: [...looseItems.values()].sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true }))
   };
 }
 
