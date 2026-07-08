@@ -131,6 +131,17 @@ function getProductId(value) {
   return value?._id || value;
 }
 
+function getItemName(item) {
+  return item?.productName || item?.itemName || item?.nativeName || "Product";
+}
+
+function buildPackedMessage(item, { orderCompleted = false, itemCompleted = false, locationLabel = "" } = {}) {
+  const itemName = getItemName(item);
+  if (orderCompleted) return `${itemName} packed and order completed`;
+  if (itemCompleted) return locationLabel ? `${itemName} qty completed in ${locationLabel}` : `${itemName} qty completed`;
+  return locationLabel ? `${itemName} packed in ${locationLabel}` : `${itemName} packed`;
+}
+
 function buildPackingLocationLabel(type, number) {
   if (type === "Loose Items") return "Loose Items";
   return `${type} ${number}`;
@@ -784,7 +795,7 @@ export async function manuallyPackOrderItem(req, res) {
   }
 
   if (item.packedQuantity >= item.quantity) {
-    return res.status(409).json({ message: `Qty completed: ${item.productName} is already fully packed` });
+    return res.status(409).json({ message: `Qty completed: ${getItemName(item)} is already fully packed` });
   }
 
   const remainingQuantity = item.quantity - item.packedQuantity;
@@ -807,8 +818,8 @@ export async function manuallyPackOrderItem(req, res) {
 
   const itemCompleted = item.packedQuantity >= item.quantity;
   res.json({
-    message: order.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed" : `${item.productName} manually packed`,
-    packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
+    message: buildPackedMessage(item, { orderCompleted: order.packedStatus === "Completed", itemCompleted, locationLabel: packingLocation.label }),
+    packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: getItemName(item) },
     order: serializeOrder(order)
   });
 }
@@ -825,7 +836,7 @@ export async function manuallyPackLooseOrderItem(req, res) {
   }
 
   if (item.packedQuantity >= item.quantity) {
-    return res.status(409).json({ message: `Qty completed: ${item.productName} is already fully packed` });
+    return res.status(409).json({ message: `Qty completed: ${getItemName(item)} is already fully packed` });
   }
 
   const looseLocation = getOrCreateLooseItemsLocation(order);
@@ -847,8 +858,8 @@ export async function manuallyPackLooseOrderItem(req, res) {
 
   const itemCompleted = item.packedQuantity >= item.quantity;
   res.json({
-    message: order.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed in Loose Items" : `${item.productName} added to Loose Items`,
-    packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
+    message: buildPackedMessage(item, { orderCompleted: order.packedStatus === "Completed", itemCompleted, locationLabel: looseLocation.label }),
+    packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: getItemName(item) },
     order: serializeOrder(order)
   });
 }
@@ -865,7 +876,7 @@ export async function manuallyPackFullOrderItem(req, res) {
   }
 
   if (item.packedQuantity >= item.quantity) {
-    return res.status(409).json({ message: `Qty completed: ${item.productName} is already fully packed` });
+    return res.status(409).json({ message: `Qty completed: ${getItemName(item)} is already fully packed` });
   }
 
   const packedNow = item.quantity - item.packedQuantity;
@@ -886,8 +897,8 @@ export async function manuallyPackFullOrderItem(req, res) {
   });
 
   res.json({
-    message: order.packedStatus === "Completed" ? "Order completed" : `${item.productName} full quantity packed`,
-    packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
+    message: buildPackedMessage(item, { orderCompleted: order.packedStatus === "Completed", itemCompleted: true, locationLabel: packingLocation.label }),
+    packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: getItemName(item) },
     order: serializeOrder(order)
   });
 }
@@ -1079,7 +1090,7 @@ export async function scanBarcode(req, res) {
     }
 
     if (item.packedQuantity >= item.quantity) {
-      return res.status(409).json({ message: `Qty completed: ${item.productName} is already fully packed` });
+      return res.status(409).json({ message: `Qty completed: ${getItemName(item)} is already fully packed` });
     }
 
     const remainingQuantity = item.quantity - item.packedQuantity;
@@ -1102,8 +1113,8 @@ export async function scanBarcode(req, res) {
 
     const itemCompleted = item.packedQuantity >= item.quantity;
     res.json({
-      message: order.packedStatus === "Completed" ? "Order completed" : itemCompleted ? "Qty completed" : "Item scanned",
-      packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: item.productName },
+      message: buildPackedMessage(item, { orderCompleted: order.packedStatus === "Completed", itemCompleted, locationLabel: packingLocation.label }),
+      packedItem: { productId: getProductId(item.productId), hsnOrBarcode: item.hsnOrBarcode, productName: getItemName(item) },
       order: serializeOrder(order)
     });
   } catch (error) {

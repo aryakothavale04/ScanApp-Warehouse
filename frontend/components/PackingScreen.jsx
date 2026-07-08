@@ -166,7 +166,7 @@ export default function PackingScreen({ orderId }) {
           replaceOrder(data.order);
           setLastPackedItemId(data.packedItem?.productId || data.packedItem?.hsnOrBarcode);
           showToast({ type: "success", message: data.message || "Item packed" });
-          const completedQuantity = data.message === "Qty completed" || data.message === "Order completed";
+          const completedQuantity = /qty completed|order completed/i.test(data.message || "");
           playScanSound(completedQuantity ? "complete" : "correct");
           window.navigator.vibrate?.(70);
           setTimeout(() => setLastPackedItemId(null), 900);
