@@ -19,13 +19,19 @@ export function getDeliveryChallanSummary(order = {}) {
   const containers = new Map();
   const looseItems = new Map();
 
+  (order.packingLocations || []).forEach((location) => {
+    if (location.type === "Loose Items") return;
+    const label = location.label || "Location";
+    containers.set(label, { label, quantity: 0 });
+  });
+
   (order.items || []).forEach((item) => {
     (item.packingLocations || []).forEach((entry) => {
       const quantity = Number(entry.quantity || 0);
       if (quantity <= 0) return;
 
       const location = locationById.get(String(entry.locationId));
-      const label = entry.label || location?.label || "Location";
+      const label = location?.label || entry.label || "Location";
       if (location?.type === "Loose Items" || label.toLowerCase() === "loose items") {
         const itemLabel = item.itemName || item.productName || item.nativeName || "Product";
         looseItems.set(itemLabel, {

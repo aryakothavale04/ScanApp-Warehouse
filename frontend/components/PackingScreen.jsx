@@ -1,6 +1,6 @@
 "use client";
 
-import { Barcode, Camera, CheckCircle2, ChevronDown, Download, Loader2, MapPin, Plus, Printer, Save, Share2, Square, Trash2, Truck, UserRound, X } from "lucide-react";
+import { Barcode, Camera, CheckCircle2, ChevronDown, Download, Loader2, MapPin, Pencil, Plus, Printer, Save, Share2, Square, Trash2, Truck, UserRound, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/src/lib/api";
 import { downloadDeliveryChallanPdf, getDeliveryChallanSummary, openDeliveryChallanPrint, shareDeliveryChallanPdf } from "@/src/lib/slips";
@@ -83,6 +83,7 @@ export default function PackingScreen({ orderId }) {
   const [partyNameOpen, setPartyNameOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
   const [locationDraft, setLocationDraft] = useState({ type: "Loose Items", number: "" });
+  const [editingLocationId, setEditingLocationId] = useState(null);
   const [savingLocation, setSavingLocation] = useState(false);
   const [deletingLocationId, setDeletingLocationId] = useState(null);
   const [challanPreviewOpen, setChallanPreviewOpen] = useState(false);
@@ -350,21 +351,36 @@ export default function PackingScreen({ orderId }) {
     }
   }, [orderId, replaceOrder, showToast]);
 
-  const handleCreatePackingLocation = useCallback(async (event) => {
+  const resetLocationForm = useCallback(() => {
+    setEditingLocationId(null);
+    setLocationDraft({ type: "Loose Items", number: "" });
+  }, []);
+
+  const handleEditPackingLocation = useCallback((location) => {
+    setEditingLocationId(location._id);
+    setLocationDraft({
+      type: location.type || "Loose Items",
+      number: location.number ? String(location.number) : ""
+    });
+  }, []);
+
+  const handleSubmitPackingLocation = useCallback(async (event) => {
     event.preventDefault();
     setSavingLocation(true);
     try {
-      const data = await api.createPackingLocation(orderId, locationDraft);
+      const data = editingLocationId
+        ? await api.updatePackingLocation(orderId, editingLocationId, locationDraft)
+        : await api.createPackingLocation(orderId, locationDraft);
       replaceOrder(data.order);
-      setLocationDraft({ type: "Loose Items", number: "" });
+      resetLocationForm();
       setLocationOpen(false);
-      showToast({ type: "success", message: data.message || "Packing location created" });
+      showToast({ type: "success", message: data.message || (editingLocationId ? "Packing location updated" : "Packing location created") });
     } catch (error) {
       showToast({ type: "error", message: error.message });
     } finally {
       setSavingLocation(false);
     }
-  }, [locationDraft, orderId, replaceOrder, showToast]);
+  }, [editingLocationId, locationDraft, orderId, replaceOrder, resetLocationForm, showToast]);
 
   const handleDeletePackingLocation = useCallback(async (location) => {
     setDeletingLocationId(location._id);
@@ -710,7 +726,10 @@ export default function PackingScreen({ orderId }) {
               </div>
               <button
                 type="button"
-                onClick={() => setLocationOpen(false)}
+                onClick={() => {
+                  setLocationOpen(false);
+                  resetLocationForm();
+                }}
                 className="grid h-9 w-9 place-items-center rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#101712] sm:h-10 sm:w-10"
                 aria-label="Close packing location"
               >
@@ -725,7 +744,7 @@ export default function PackingScreen({ orderId }) {
                 return (
                   <div
                     key={location._id}
-                    className={`grid grid-cols-[1fr_auto] items-stretch gap-1.5 rounded-lg border p-1.5 ${selected ? "border-leaf bg-leaf/10 text-leaf" : "border-black/10 bg-white dark:border-white/10 dark:bg-[#101712]"}`}
+                    className={`grid grid-cols-[1fr_auto_auto] items-stretch gap-1.5 rounded-lg border p-1.5 ${selected ? "border-leaf bg-leaf/10 text-leaf" : "border-black/10 bg-white dark:border-white/10 dark:bg-[#101712]"}`}
                   >
                     <button
                       type="button"
@@ -738,6 +757,16 @@ export default function PackingScreen({ orderId }) {
                         <span className="min-w-0 break-words leading-snug">{location.label}</span>
                       </span>
                       {selected ? <CheckCircle2 size={17} className="shrink-0" /> : null}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleEditPackingLocation(location)}
+                      disabled={savingLocation || Boolean(deletingLocationId)}
+                      className="grid h-10 w-10 place-items-center rounded-md border border-black/10 bg-white text-black/70 disabled:opacity-40 dark:border-white/10 dark:bg-[#151f1a] dark:text-white/70"
+                      aria-label={`Edit ${location.label}`}
+                      title="Edit location"
+                    >
+                      <Pencil size={15} />
                     </button>
                     <button
                       type="button"
@@ -754,14 +783,25 @@ export default function PackingScreen({ orderId }) {
               })}
             </div>
 
-            <form onSubmit={handleCreatePackingLocation} className="rounded-lg border border-black/10 p-2.5 dark:border-white/10 sm:p-3">
-              <h3 className="mb-2 text-sm font-black">Create New Location</h3>
+            <form onSubmit={handleSubmitPackingLocation} className="rounded-lg border border-black/10 p-2.5 dark:border-white/10 sm:p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-black">{editingLocationId ? "Edit Location" : "Create New Location"}</h3>
+                {editingLocationId && (
+                  <button
+                    type="button"
+                    onClick={resetLocationForm}
+                    className="min-h-8 rounded-lg border border-black/10 px-3 py-1 text-xs font-bold dark:border-white/10"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
               <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_112px]">
                 <label className="grid min-w-0 gap-1 text-xs font-bold">
                   Type
                   <select
                     value={locationDraft.type}
-                    onChange={(event) => setLocationDraft((current) => ({ ...current, type: event.target.value }))}
+                    onChange={(event) => setLocationDraft((current) => ({ ...current, type: event.target.value, number: event.target.value === "Loose Items" ? "" : current.number }))}
                     className="min-h-11 w-full min-w-0 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-bold outline-none focus:border-leaf dark:bg-[#101712]"
                   >
                     <option>Tray</option>
@@ -791,8 +831,8 @@ export default function PackingScreen({ orderId }) {
                 aria-busy={savingLocation ? "true" : undefined}
                 className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-leaf px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
-                {savingLocation ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
-                {savingLocation ? "Saving..." : "Create New Location"}
+                {savingLocation ? <Loader2 className="animate-spin" size={16} /> : editingLocationId ? <Save size={16} /> : <Plus size={16} />}
+                {savingLocation ? "Saving..." : editingLocationId ? "Update Location" : "Create New Location"}
               </button>
             </form>
           </section>

@@ -564,6 +564,58 @@ export async function createPackingLocation(req, res) {
   res.status(201).json({ message: `${label} created`, order: serializeOrder(order) });
 }
 
+export async function updatePackingLocation(req, res) {
+  const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
+  if (!order) {
+    return res.status(404).json({ message: "Order not found" });
+  }
+
+  ensureDefaultPackingLocation(order);
+  const location = order.packingLocations.id?.(req.params.locationId) || order.packingLocations.find((entry) => entry._id?.toString() === req.params.locationId);
+  if (!location) {
+    return res.status(404).json({ message: "Packing location not found" });
+  }
+
+  const type = req.body?.type?.toString().trim();
+  const number = type === "Loose Items" ? undefined : Number.parseInt(req.body?.number, 10);
+  if (!["Tray", "Box", "Bag", "Loose Items"].includes(type)) {
+    return res.status(400).json({ message: "Location type must be Tray, Box, Bag, or Loose Items" });
+  }
+  if (isContainerLocation(type) && (!Number.isInteger(number) || number <= 0)) {
+    return res.status(400).json({ message: "Location number must be greater than 0" });
+  }
+
+  const label = buildPackingLocationLabel(type, number);
+  const duplicate = order.packingLocations.find((entry) => (
+    entry._id?.toString() !== location._id?.toString() &&
+    entry.type === type &&
+    (type === "Loose Items" || entry.number === number)
+  ));
+  if (duplicate) {
+    return res.status(409).json({ message: `${label} already exists on this order` });
+  }
+
+  const conflict = await findActiveLocationConflict({ orderId: order._id, type, number });
+  if (conflict) {
+    return res.status(409).json({ message: `${label} is already in use. Please choose another ${type.toLowerCase()} number.` });
+  }
+
+  location.type = type;
+  location.number = number;
+  location.label = label;
+
+  getActiveItems(order.items || []).forEach((item) => {
+    (item.packingLocations || []).forEach((entry) => {
+      if (entry.locationId?.toString() === location._id?.toString()) {
+        entry.label = label;
+      }
+    });
+  });
+
+  await order.save();
+  res.json({ message: `${label} updated`, order: serializeOrder(order) });
+}
+
 export async function selectPackingLocation(req, res) {
   const order = await populateOrder(Order.findOne({ _id: req.params.id, trashedAt: { $exists: false } }));
   if (!order) {

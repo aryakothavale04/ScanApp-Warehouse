@@ -21,6 +21,7 @@ import {
   restoreOrderItem,
   scanBarcode,
   selectPackingLocation,
+  updatePackingLocation,
   updateOrderSequence,
   updateOrder,
   updateOrderItem,
@@ -51,6 +52,7 @@ router.post("/:id/trash/items/:itemIndex/restore", asyncHandler(restoreOrderItem
 router.delete("/:id/trash/items/:itemIndex/permanent", asyncHandler(permanentlyDeleteOrderItem));
 router.post("/:id/scan", asyncHandler(scanBarcode));
 router.post("/:id/packing-locations", asyncHandler(createPackingLocation));
+router.patch("/:id/packing-locations/:locationId", asyncHandler(updatePackingLocation));
 router.patch("/:id/packing-locations/:locationId/active", asyncHandler(selectPackingLocation));
 router.delete("/:id/packing-locations/:locationId", asyncHandler(deletePackingLocation));
 router.post("/:id/manual-complete", asyncHandler(manuallyCompleteOrder));
