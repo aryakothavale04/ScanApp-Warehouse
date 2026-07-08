@@ -82,7 +82,7 @@ export default function PackingScreen({ orderId }) {
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [partyNameOpen, setPartyNameOpen] = useState(false);
   const [locationOpen, setLocationOpen] = useState(false);
-  const [locationDraft, setLocationDraft] = useState({ type: "Tray", number: "" });
+  const [locationDraft, setLocationDraft] = useState({ type: "Loose Items", number: "" });
   const [savingLocation, setSavingLocation] = useState(false);
   const [deletingLocationId, setDeletingLocationId] = useState(null);
   const [challanPreviewOpen, setChallanPreviewOpen] = useState(false);
@@ -135,13 +135,6 @@ export default function PackingScreen({ orderId }) {
   useEffect(() => {
     loadOrder();
   }, [loadOrder]);
-
-  useEffect(() => {
-    if (!loading && order && !locationPrompted) {
-      setLocationOpen(true);
-      setLocationPrompted(true);
-    }
-  }, [loading, locationPrompted, order]);
 
   const progress = useMemo(() => {
     if (!order) return { packedQuantity: 0, totalQuantity: 0 };
@@ -363,7 +356,7 @@ export default function PackingScreen({ orderId }) {
     try {
       const data = await api.createPackingLocation(orderId, locationDraft);
       replaceOrder(data.order);
-      setLocationDraft({ type: "Tray", number: "" });
+      setLocationDraft({ type: "Loose Items", number: "" });
       setLocationOpen(false);
       showToast({ type: "success", message: data.message || "Packing location created" });
     } catch (error) {
@@ -439,6 +432,10 @@ export default function PackingScreen({ orderId }) {
         armScanAudio();
         setScannerActive(true);
         setCameraActive(false);
+        if (!locationPrompted) {
+          setLocationOpen(true);
+          setLocationPrompted(true);
+        }
       }}
       className="flex min-h-10 w-full items-center justify-center gap-2 rounded-lg bg-leaf px-3 py-2 text-sm font-bold text-white sm:min-h-12 sm:px-4 sm:py-3 sm:text-base"
     >
@@ -481,7 +478,7 @@ export default function PackingScreen({ orderId }) {
       <MapPin size={18} className="shrink-0 text-leaf" />
       <span className="min-w-0 flex-1">
         <span className="block text-[11px] font-semibold text-black/50 dark:text-white/50 sm:text-xs">Active Packing Location</span>
-        <span className="block max-w-full break-words text-sm font-black leading-snug sm:text-base">{activePackingLocation?.label || "Tray 1"}</span>
+        <span className="block max-w-full break-words text-sm font-black leading-snug sm:text-base">{activePackingLocation?.label || "Loose Items"}</span>
       </span>
       <ChevronDown size={17} className="shrink-0 text-black/45 dark:text-white/45" />
     </button>

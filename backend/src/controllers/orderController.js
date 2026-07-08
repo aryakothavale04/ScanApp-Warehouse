@@ -36,10 +36,9 @@ function serializeOrder(order, { includeDeletedItems = false } = {}) {
   if (!data) return data;
 
   const packingLocations = data.packingLocations?.length ? data.packingLocations : [{
-    _id: data.activePackingLocationId || "default-tray-1",
-    type: "Tray",
-    number: 1,
-    label: "Tray 1"
+    _id: data.activePackingLocationId || "default-loose-items",
+    type: "Loose Items",
+    label: "Loose Items"
   }];
   const activePackingLocationId = data.activePackingLocationId || packingLocations[0]?._id;
   const activeItems = getActiveItems(data.items || []);
@@ -157,9 +156,8 @@ async function findActiveLocationConflict({ orderId, type, number }) {
 function ensureDefaultPackingLocation(order) {
   if (!order.packingLocations?.length) {
     order.packingLocations = [{
-      type: "Tray",
-      number: 1,
-      label: "Tray 1"
+      type: "Loose Items",
+      label: "Loose Items"
     }];
   }
 
@@ -543,6 +541,11 @@ export async function createPackingLocation(req, res) {
     location.type === type && (type === "Loose Items" || location.number === number)
   ));
   if (existing) {
+    const conflict = await findActiveLocationConflict({ orderId: order._id, type, number });
+    if (conflict) {
+      return res.status(409).json({ message: `${existing.label} is already in use. Please choose another ${type.toLowerCase()} number.` });
+    }
+
     order.activePackingLocationId = existing._id;
     await order.save();
     return res.json({ message: `${existing.label} selected`, order: serializeOrder(order) });
@@ -568,11 +571,16 @@ export async function selectPackingLocation(req, res) {
   }
 
   ensureDefaultPackingLocation(order);
-  const location = req.params.locationId === "default-tray-1"
+  const location = req.params.locationId === "default-loose-items" || req.params.locationId === "default-tray-1"
     ? order.packingLocations[0]
     : order.packingLocations.id?.(req.params.locationId) || order.packingLocations.find((entry) => entry._id?.toString() === req.params.locationId);
   if (!location) {
     return res.status(404).json({ message: "Packing location not found" });
+  }
+
+  const conflict = await findActiveLocationConflict({ orderId: order._id, type: location.type, number: location.number });
+  if (conflict) {
+    return res.status(409).json({ message: `${location.label} is already in use. Please choose another ${location.type.toLowerCase()} number.` });
   }
 
   order.activePackingLocationId = location._id;
